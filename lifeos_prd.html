@@ -1,0 +1,831 @@
+<style>
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    color: var(--text-primary);
+  }
+
+  .prd-root {
+    padding: 1.5rem 0;
+    max-width: 680px;
+  }
+
+  .prd-header {
+    border-bottom: 0.5px solid var(--border-strong);
+    padding-bottom: 1.25rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .prd-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg-accent);
+    color: var(--text-accent);
+    font-size: 11px;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: var(--radius);
+    margin-bottom: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .prd-title {
+    font-size: 22px;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+
+  .prd-subtitle {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+
+  .prd-meta {
+    display: flex;
+    gap: 16px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+
+  .prd-meta-item {
+    font-size: 12px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .prd-meta-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--border-strong);
+  }
+
+  .section {
+    margin-bottom: 1.75rem;
+  }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .section-title {
+    font-size: 16px;
+    font-weight: 500;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 0.5px solid var(--border);
+  }
+
+  .prose {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.75;
+  }
+
+  .pillars {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .pillar {
+    background: var(--surface-1);
+    border: 0.5px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+  }
+
+  .pillar-icon {
+    font-size: 18px;
+    margin-bottom: 6px;
+  }
+
+  .pillar-name {
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 3px;
+  }
+
+  .pillar-desc {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  .user-story {
+    background: var(--surface-1);
+    border: 0.5px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+  }
+
+  .story-trigger {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+    font-style: italic;
+  }
+
+  .story-text {
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .arch-layer {
+    margin-bottom: 10px;
+  }
+
+  .arch-layer-title {
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .arch-layer-badge {
+    font-size: 11px;
+    background: var(--surface-1);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1px 8px;
+    color: var(--text-secondary);
+  }
+
+  .arch-layer-items {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    padding-left: 16px;
+  }
+
+  .phase {
+    background: var(--surface-2);
+    border: 0.5px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+
+  .phase-header {
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 0.5px solid var(--border);
+  }
+
+  .phase-num {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--bg-accent);
+    color: var(--text-accent);
+    font-size: 11px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .phase-name {
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .phase-tag {
+    margin-left: auto;
+    font-size: 11px;
+    background: var(--surface-1);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1px 8px;
+    color: var(--text-muted);
+  }
+
+  .phase-body {
+    padding: 10px 14px;
+  }
+
+  .phase-task {
+    font-size: 12px;
+    color: var(--text-secondary);
+    padding: 3px 0;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    line-height: 1.5;
+  }
+
+  .phase-task::before {
+    content: "–";
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  .deliverable {
+    font-size: 11px;
+    background: var(--bg-success);
+    color: var(--text-success);
+    border-radius: var(--radius);
+    padding: 2px 8px;
+    margin-top: 8px;
+    display: inline-block;
+  }
+
+  .endpoints {
+    font-size: 12px;
+  }
+
+  .endpoint-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 5px 0;
+    border-bottom: 0.5px solid var(--border);
+  }
+
+  .endpoint-row:last-child {
+    border-bottom: none;
+  }
+
+  .method {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    padding: 1px 6px;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+
+  .method-post {
+    background: var(--bg-success);
+    color: var(--text-success);
+  }
+
+  .method-get {
+    background: var(--bg-accent);
+    color: var(--text-accent);
+  }
+
+  .method-patch {
+    background: var(--bg-warning);
+    color: var(--text-warning);
+  }
+
+  .endpoint-path {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-primary);
+    flex-shrink: 0;
+  }
+
+  .endpoint-desc {
+    color: var(--text-muted);
+    font-size: 11px;
+  }
+
+  .risk-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 8px 0;
+    border-bottom: 0.5px solid var(--border);
+    font-size: 12px;
+  }
+
+  .risk-row:last-child {
+    border-bottom: none;
+  }
+
+  .risk-sev {
+    padding: 1px 8px;
+    border-radius: var(--radius);
+    font-size: 11px;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+
+  .risk-high {
+    background: var(--bg-danger);
+    color: var(--text-danger);
+  }
+
+  .risk-med {
+    background: var(--bg-warning);
+    color: var(--text-warning);
+  }
+
+  .risk-desc {
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  .risk-mit {
+    color: var(--text-muted);
+    font-size: 11px;
+    margin-top: 2px;
+  }
+
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .kpi-card {
+    background: var(--surface-1);
+    border: 0.5px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 12px;
+  }
+
+  .kpi-value {
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .kpi-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    line-height: 1.4;
+  }
+
+  .toc {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 1.5rem;
+  }
+
+  .toc-item {
+    font-size: 12px;
+    background: var(--surface-1);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 4px 10px;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+
+  .toc-item:hover {
+    border-color: var(--border-accent);
+    color: var(--text-accent);
+  }
+
+  .scope-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  .scope-table th {
+    text-align: left;
+    font-weight: 500;
+    color: var(--text-muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 4px 8px 8px;
+  }
+
+  .scope-table td {
+    padding: 6px 8px;
+    border-top: 0.5px solid var(--border);
+    color: var(--text-secondary);
+    line-height: 1.5;
+    vertical-align: top;
+  }
+
+  .in {
+    color: var(--text-success);
+    font-size: 11px;
+  }
+
+  .out {
+    color: var(--text-danger);
+    font-size: 11px;
+  }
+</style>
+
+<div class="prd-root" role="main">
+  <h2 class="sr-only">lifeOS Product Requirements Document</h2>
+
+  <div class="prd-header">
+    <div class="prd-badge"><i class="ti ti-file-description" aria-hidden="true"></i> PRD · v0.1</div>
+    <div class="prd-title">lifeOS</div>
+    <div class="prd-subtitle">Voice-first AI scheduling assistant — delegate your tasks, speak your day, let lifeOS
+      handle the calendar.</div>
+    <div class="prd-meta">
+      <span class="prd-meta-item">Stage: POC</span>
+      <span class="prd-meta-dot"></span>
+      <span class="prd-meta-item">Surface: Web → WhatsApp</span>
+      <span class="prd-meta-dot"></span>
+      <span class="prd-meta-item">Calendar: Google Calendar API</span>
+      <span class="prd-meta-dot"></span>
+      <span class="prd-meta-item">Author: Spore</span>
+    </div>
+  </div>
+
+  <div class="toc">
+    <div class="toc-item" onclick="sendPrompt('Tell me more about the lifeOS problem statement')">Problem</div>
+    <div class="toc-item" onclick="sendPrompt('Tell me more about lifeOS POC scope')">Scope</div>
+    <div class="toc-item" onclick="sendPrompt('Tell me more about lifeOS user stories')">User stories</div>
+    <div class="toc-item" onclick="sendPrompt('Tell me more about lifeOS system architecture')">Architecture</div>
+    <div class="toc-item" onclick="sendPrompt('Tell me more about lifeOS implementation phases')">Phases</div>
+    <div class="toc-item" onclick="sendPrompt('What are the lifeOS API endpoints?')">API design ↗</div>
+    <div class="toc-item" onclick="sendPrompt('What are the biggest risks for lifeOS?')">Risks</div>
+    <div class="toc-item" onclick="sendPrompt('What are the lifeOS success metrics?')">Success metrics</div>
+  </div>
+
+  <!-- Problem -->
+  <div class="section">
+    <div class="section-label">01</div>
+    <div class="section-title">Problem statement</div>
+    <p class="prose">Professionals juggle a constant stream of tasks, blockers, and interruptions throughout the day.
+      Existing scheduling tools require manual calendar management — an activity that is itself a cognitive burden. When
+      priorities shift (a blocker appears, an ad hoc request lands), re-scheduling is time-consuming and often
+      abandoned.</p>
+    <p class="prose" style="margin-top: 10px;">lifeOS removes that friction. Users speak their tasks — raw,
+      unstructured, just like thinking out loud — and lifeOS extracts, schedules, and reschedules them intelligently,
+      with Google Calendar as the live record of truth.</p>
+  </div>
+
+  <!-- Core pillars -->
+  <div class="section">
+    <div class="section-label">02</div>
+    <div class="section-title">Four pillars this POC proves</div>
+    <div class="pillars">
+      <div class="pillar">
+        <div class="pillar-icon"><i class="ti ti-microphone" aria-hidden="true"></i></div>
+        <div class="pillar-name">Voice → task extraction</div>
+        <div class="pillar-desc">Whisper transcribes free-form speech. Claude extracts structured tasks with title,
+          estimated duration, deadline, and priority.</div>
+      </div>
+      <div class="pillar">
+        <div class="pillar-icon"><i class="ti ti-calendar-event" aria-hidden="true"></i></div>
+        <div class="pillar-name">Auto-scheduling</div>
+        <div class="pillar-desc">lifeOS finds open slots in the user's Google Calendar and creates events, respecting
+          work hours and existing blocks.</div>
+      </div>
+      <div class="pillar">
+        <div class="pillar-icon"><i class="ti ti-refresh" aria-hidden="true"></i></div>
+        <div class="pillar-name">Dynamic rescheduling</div>
+        <div class="pillar-desc">When a blocker is flagged or an ad hoc task is added, lifeOS automatically cascades and
+          reschedules affected events.</div>
+      </div>
+      <div class="pillar">
+        <div class="pillar-icon"><i class="ti ti-message-dots" aria-hidden="true"></i></div>
+        <div class="pillar-name">Chain-of-thought clarification</div>
+        <div class="pillar-desc">Before acting on ambiguous input, lifeOS surfaces targeted clarifying questions — one
+          at a time, conversationally.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scope -->
+  <div class="section">
+    <div class="section-label">03</div>
+    <div class="section-title">POC scope</div>
+    <table class="scope-table">
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Status</th>
+          <th>Notes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Voice input via browser mic (Whisper)</td>
+          <td><span class="in">✓ In</span></td>
+          <td>Web Speech API fallback for low latency</td>
+        </tr>
+        <tr>
+          <td>Free-text chat input</td>
+          <td><span class="in">✓ In</span></td>
+          <td>Same pipeline as voice</td>
+        </tr>
+        <tr>
+          <td>Task extraction + structuring (Claude)</td>
+          <td><span class="in">✓ In</span></td>
+          <td>Title, duration, deadline, priority</td>
+        </tr>
+        <tr>
+          <td>Google Calendar read + write</td>
+          <td><span class="in">✓ In</span></td>
+          <td>OAuth 2.0, Events API</td>
+        </tr>
+        <tr>
+          <td>Blocker flagging + reschedule</td>
+          <td><span class="in">✓ In</span></td>
+          <td>Triggered via voice/chat</td>
+        </tr>
+        <tr>
+          <td>Clarification loop (CoT)</td>
+          <td><span class="in">✓ In</span></td>
+          <td>Claude asks 1 Q at a time</td>
+        </tr>
+        <tr>
+          <td>WhatsApp integration</td>
+          <td><span class="in">✓ In (Phase 2)</span></td>
+          <td>Twilio / WhatsApp Cloud API</td>
+        </tr>
+        <tr>
+          <td>Multi-user / team scheduling</td>
+          <td><span class="out">✗ Out</span></td>
+          <td>Post-POC</td>
+        </tr>
+        <tr>
+          <td>Native mobile app</td>
+          <td><span class="out">✗ Out</span></td>
+          <td>Post-POC</td>
+        </tr>
+        <tr>
+          <td>Outlook / Apple Calendar</td>
+          <td><span class="out">✗ Out</span></td>
+          <td>Post-POC</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- User stories -->
+  <div class="section">
+    <div class="section-label">04</div>
+    <div class="section-title">Core user stories</div>
+
+    <div class="user-story">
+      <div class="story-trigger">User speaks or types a brain dump of tasks</div>
+      <div class="story-text">As a user, I want to say "I need to finish the proposal, review Aditya's PR, and prep for
+        the 4pm call" and have lifeOS extract those as discrete tasks, estimate durations, and schedule them into my
+        available calendar slots.</div>
+    </div>
+    <div class="user-story">
+      <div class="story-trigger">User flags a blocker mid-day</div>
+      <div class="story-text">As a user, I want to say "the proposal is blocked on client feedback" and have lifeOS push
+        it out to the next available slot, automatically cascading any affected tasks.</div>
+    </div>
+    <div class="user-story">
+      <div class="story-trigger">Ad hoc task lands</div>
+      <div class="story-text">As a user, I want to say "I need to jump on an urgent call for 30 minutes" and have lifeOS
+        find the best slot for it and tell me what gets pushed as a result.</div>
+    </div>
+    <div class="user-story">
+      <div class="story-trigger">Ambiguous input</div>
+      <div class="story-text">As a user, when I say something vague like "sort out the design stuff", I want lifeOS to
+        ask "what does 'design stuff' refer to, and when does it need to be done?" before scheduling anything.</div>
+    </div>
+    <div class="user-story">
+      <div class="story-trigger">WhatsApp brain dump (Phase 2)</div>
+      <div class="story-text">As a user, I want to send a voice note or text on WhatsApp and have lifeOS process it the
+        same way as the web app, then reply with a confirmation of what was scheduled.</div>
+    </div>
+  </div>
+
+  <!-- Architecture -->
+  <div class="section">
+    <div class="section-label">05</div>
+    <div class="section-title">System architecture</div>
+
+    <div class="arch-layer">
+      <div class="arch-layer-title">Frontend <span class="arch-layer-badge">Next.js 14 · App Router · Tailwind</span>
+      </div>
+      <div class="arch-layer-items">
+        Voice recorder component (MediaRecorder API → WAV blob) · Chat thread UI · Task confirmation panel · Calendar
+        preview widget (read-only) · Auth flow (Google OAuth)
+      </div>
+    </div>
+    <div class="arch-layer" style="margin-top:12px">
+      <div class="arch-layer-title">API layer <span class="arch-layer-badge">Next.js Route Handlers · TypeScript</span>
+      </div>
+      <div class="arch-layer-items">
+        /api/transcribe → Whisper (OpenAI or self-hosted) · /api/parse → Claude (task extraction + CoT) · /api/schedule
+        → scheduling engine · /api/calendar → Google Calendar proxy · /api/whatsapp → webhook receiver (Phase 2)
+      </div>
+    </div>
+    <div class="arch-layer" style="margin-top:12px">
+      <div class="arch-layer-title">AI core <span class="arch-layer-badge">Claude claude-sonnet-4-6 · Structured
+          output</span></div>
+      <div class="arch-layer-items">
+        System prompt defines the scheduler persona · Conversation history maintains CoT · Returns structured JSON:
+        {tasks[], clarifications[], actions[]} · Streaming for perceived speed
+      </div>
+    </div>
+    <div class="arch-layer" style="margin-top:12px">
+      <div class="arch-layer-title">Scheduling engine <span class="arch-layer-badge">Pure TS · Stateless</span></div>
+      <div class="arch-layer-items">
+        Reads free/busy blocks from Google Calendar · Applies work hours constraint (user-configurable) · Fits tasks
+        into gaps using a greedy first-fit algorithm · Cascade logic for rescheduling: bump shortest-deadline first
+      </div>
+    </div>
+    <div class="arch-layer" style="margin-top:12px">
+      <div class="arch-layer-title">Integrations</div>
+      <div class="arch-layer-items">
+        Google Calendar API v3 (Events: insert, update, delete, freebusy) · Google OAuth 2.0 (nextauth.js) · OpenAI
+        Whisper API (transcription) · Twilio WhatsApp Cloud API (Phase 2)
+      </div>
+    </div>
+    <div class="arch-layer" style="margin-top:12px">
+      <div class="arch-layer-title">State / persistence <span class="arch-layer-badge">Minimal for POC</span></div>
+      <div class="arch-layer-items">
+        Session: NextAuth.js + encrypted JWT · Conversation history: in-memory per session (server) · Task metadata:
+        stored as Google Calendar event extended properties — no separate DB needed for POC
+      </div>
+    </div>
+  </div>
+
+  <!-- Implementation phases -->
+  <div class="section">
+    <div class="section-label">06</div>
+    <div class="section-title">Implementation plan</div>
+
+    <div class="phase">
+      <div class="phase-header">
+        <div class="phase-num">1</div>
+        <div class="phase-name">Foundation + voice pipeline</div>
+        <div class="phase-tag">Week 1–2</div>
+      </div>
+      <div class="phase-body">
+        <div class="phase-task">Scaffold Next.js 14 project with TypeScript, Tailwind, App Router</div>
+        <div class="phase-task">Google OAuth via NextAuth.js — login + token storage</div>
+        <div class="phase-task">MediaRecorder → WAV blob → Whisper API → transcript</div>
+        <div class="phase-task">Basic chat UI: user message bubble + assistant response</div>
+        <div class="phase-task">Claude prompt: take transcript, return structured task JSON</div>
+        <div class="deliverable">✓ Deliverable: speak a task, see it extracted as structured data</div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-header">
+        <div class="phase-num">2</div>
+        <div class="phase-name">Calendar integration + scheduling engine</div>
+        <div class="phase-tag">Week 3–4</div>
+      </div>
+      <div class="phase-body">
+        <div class="phase-task">Google Calendar API wrapper: freebusy query, event insert/update/delete</div>
+        <div class="phase-task">Scheduling engine: greedy first-fit into free slots, work hours config</div>
+        <div class="phase-task">Confirmation step: show proposed schedule before writing to calendar</div>
+        <div class="phase-task">Store lifeOS metadata as event extended properties (task ID, priority, blockers)</div>
+        <div class="phase-task">Calendar preview widget: read-only day view showing scheduled tasks</div>
+        <div class="deliverable">✓ Deliverable: voice → tasks → events appear on Google Calendar</div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-header">
+        <div class="phase-num">3</div>
+        <div class="phase-name">Rescheduling + CoT clarification</div>
+        <div class="phase-tag">Week 5–6</div>
+      </div>
+      <div class="phase-body">
+        <div class="phase-task">Blocker flagging intent: Claude detects "X is blocked" and triggers reschedule flow
+        </div>
+        <div class="phase-task">Cascade logic: identify affected events, compute new slots, update calendar batch</div>
+        <div class="phase-task">Ad hoc task insertion: finds gap, bumps lowest-priority task if needed</div>
+        <div class="phase-task">CoT clarification loop: when Claude confidence is low, return a clarifying question;
+          hold scheduling until resolved</div>
+        <div class="phase-task">Conversation history management: maintain full thread in session for context</div>
+        <div class="deliverable">✓ Deliverable: all four POC pillars working end-to-end</div>
+      </div>
+    </div>
+
+    <div class="phase">
+      <div class="phase-header">
+        <div class="phase-num">4</div>
+        <div class="phase-name">WhatsApp channel + polish</div>
+        <div class="phase-tag">Week 7–8</div>
+      </div>
+      <div class="phase-body">
+        <div class="phase-task">Twilio / WhatsApp Cloud API webhook: receive text + voice notes</div>
+        <div class="phase-task">Voice note download + Whisper transcription (same pipeline as web)</div>
+        <div class="phase-task">WhatsApp reply formatter: plain text confirmations + task summaries</div>
+        <div class="phase-task">User identity linking: WhatsApp number → Google account</div>
+        <div class="phase-task">POC hardening: error states, auth token refresh, basic rate limiting</div>
+        <div class="deliverable">✓ Deliverable: POC complete, demo-ready on web + WhatsApp</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- API design -->
+  <div class="section">
+    <div class="section-label">07</div>
+    <div class="section-title">Key API endpoints</div>
+    <div class="endpoints">
+      <div class="endpoint-row"><span class="method method-post">POST</span><span
+          class="endpoint-path">/api/transcribe</span><span class="endpoint-desc">Audio blob → transcript string via
+          Whisper</span></div>
+      <div class="endpoint-row"><span class="method method-post">POST</span><span
+          class="endpoint-path">/api/parse</span><span class="endpoint-desc">Transcript + history → tasks[] +
+          clarifications[] (Claude)</span></div>
+      <div class="endpoint-row"><span class="method method-post">POST</span><span
+          class="endpoint-path">/api/schedule</span><span class="endpoint-desc">Tasks[] → proposed calendar slots
+          (scheduling engine)</span></div>
+      <div class="endpoint-row"><span class="method method-post">POST</span><span
+          class="endpoint-path">/api/schedule/confirm</span><span class="endpoint-desc">Write confirmed schedule to
+          Google Calendar</span></div>
+      <div class="endpoint-row"><span class="method method-patch">PATCH</span><span
+          class="endpoint-path">/api/schedule/reschedule</span><span class="endpoint-desc">Blocker or ad hoc event →
+          cascade + update Calendar</span></div>
+      <div class="endpoint-row"><span class="method method-get">GET</span><span
+          class="endpoint-path">/api/calendar/today</span><span class="endpoint-desc">Read today's events + free slots
+          for preview</span></div>
+      <div class="endpoint-row"><span class="method method-post">POST</span><span
+          class="endpoint-path">/api/whatsapp/webhook</span><span class="endpoint-desc">Receive WhatsApp message/voice
+          note (Phase 2)</span></div>
+    </div>
+  </div>
+
+  <!-- Risks -->
+  <div class="section">
+    <div class="section-label">08</div>
+    <div class="section-title">Risks + mitigations</div>
+    <div class="risk-row">
+      <span class="risk-sev risk-high">High</span>
+      <div>
+        <div class="risk-desc">Whisper latency makes voice feel sluggish — breaks the "speak naturally" UX promise.
+        </div>
+        <div class="risk-mit">Mitigation: stream audio in chunks; show "processing..." with partial transcript. Fallback
+          to Web Speech API for instant transcription with Whisper cleanup.</div>
+      </div>
+    </div>
+    <div class="risk-row">
+      <span class="risk-sev risk-high">High</span>
+      <div>
+        <div class="risk-desc">Claude misreads task intent; schedules wrong things → user loses trust immediately.</div>
+        <div class="risk-mit">Mitigation: always show confirmation step before writing to calendar. CoT clarification
+          catches the ambiguous cases before they hit the scheduler.</div>
+      </div>
+    </div>
+    <div class="risk-row">
+      <span class="risk-sev risk-med">Med</span>
+      <div>
+        <div class="risk-desc">Google Calendar OAuth token management is complex — refresh failures break the whole app.
+        </div>
+        <div class="risk-mit">Mitigation: use NextAuth.js with automatic token refresh. Surface auth errors clearly with
+          re-auth prompt.</div>
+      </div>
+    </div>
+    <div class="risk-row">
+      <span class="risk-sev risk-med">Med</span>
+      <div>
+        <div class="risk-desc">Scheduling engine produces bad slot choices (conflicts, wrong hours).</div>
+        <div class="risk-mit">Mitigation: always show proposed schedule before confirming. Let user drag/edit before
+          commit.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Success metrics -->
+  <div class="section">
+    <div class="section-label">09</div>
+    <div class="section-title">POC success metrics</div>
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-value">&lt; 4s</div>
+        <div class="kpi-label">Voice → extracted tasks (end-to-end)</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-value">&gt; 85%</div>
+        <div class="kpi-label">Task extraction accuracy on test inputs</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-value">0</div>
+        <div class="kpi-label">Silent calendar writes (always confirm first)</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-value">✓</div>
+        <div class="kpi-label">Blocker → reschedule cascade working</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-value">✓</div>
+        <div class="kpi-label">WhatsApp voice note → Calendar event</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-value">✓</div>
+        <div class="kpi-label">CoT clarification stops bad schedules</div>
+      </div>
+    </div>
+  </div>
+
+</div>

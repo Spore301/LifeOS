@@ -1,0 +1,41 @@
+import { getServerSession } from 'next-auth';
+import { NextRequest } from 'next/server';
+import { authOptions } from './auth';
+
+/**
+ * Resolve the acting user id for an API request.
+ * Priority:
+ *  1. A valid NextAuth session (web UI).
+ *  2. The LifeOS admin/dev header (used by the local OpenCode agent tools).
+ * Falls back to a dev user id in local POC mode.
+ */
+export async function resolveUserId(req: NextRequest): Promise<string | null> {
+  // 1. Web session
+  try {
+    const session: any = await getServerSession(authOptions);
+    if (session?.user?.id) return session.user.id;
+    if (session?.user?.email) return session.user.email;
+  } catch {
+    // next-auth not configured -> fall through
+  }
+
+  // 2. Dev/admin header (used by the OpenCode agent's server-to-server tool calls).
+  //    In local dev we trust the X-LifeOS-User header so an authenticated agent call
+  //    resolves to the real (signed-in) user and their stored Google token.
+  const headerUser = req.headers.get('x-lifeos-user');
+  const devSecret = process.env.LIFEOS_ADMIN_SECRET;
+  const headerSecret = req.headers.get('x-lifeos-admin');
+
+  if (process.env.NODE_ENV !== 'production') {
+    if (headerUser) return headerUser;
+  } else if (headerUser && devSecret && headerSecret && headerSecret === devSecret) {
+    return headerUser;
+  }
+
+  // 3. Local dev default
+  if (process.env.NODE_ENV !== 'production') {
+    return process.env.LIFEOS_DEV_USER || 'local-dev-user';
+  }
+
+  return null;
+}
