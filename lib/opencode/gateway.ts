@@ -260,7 +260,7 @@ export async function streamChatMessage(
   sessionId: string,
   directory: string,
   userText: string,
-  opts: { resume?: boolean } = {},
+  opts: { resume?: boolean; signal?: AbortSignal } = {},
   onEvent: (event: AgentStreamEvent) => void = () => {}
 ): Promise<string> {
   const client = getClient();
@@ -273,7 +273,24 @@ export async function streamChatMessage(
   //  - The event stream is scoped per directory. Without ?directory= the server
   //    sends only heartbeats and the run appears to hang forever.
   const abort = new AbortController();
-  const timeout = setTimeout(() => abort.abort(), RUN_TIMEOUT_MS);
+
+  // Giving up on the event stream is NOT the same as stopping the run. opencode
+  // handles prompts serially per session, so a run left going holds that session
+  // busy and every later message in the chat queues behind it forever - the chat
+  // appears stuck on "Thinking...". Always stop the run when we stop listening.
+  let stopped = false;
+  const stopRun = (reason: string) => {
+    if (stopped) return;
+    stopped = true;
+    abort.abort();
+    abortSession(sessionId).catch(() => {
+      console.error(`Failed to abort opencode run for ${sessionId} after ${reason}`);
+    });
+  };
+
+  const timeout = setTimeout(() => stopRun('run timeout'), RUN_TIMEOUT_MS);
+  // A browser that navigated away should not leave its chat wedged either.
+  opts.signal?.addEventListener('abort', () => stopRun('client disconnect'));
 
   const eventUrl = `${OPENCODE_BASE_URL}/event?directory=${encodeURIComponent(directory)}`;
   const eventRes = await fetch(eventUrl, {

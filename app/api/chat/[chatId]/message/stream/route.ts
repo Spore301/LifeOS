@@ -76,7 +76,7 @@ export async function POST(req: NextRequest, ctx: any) {
             // 'done' is re-sent below with the transcript attached.
             if (event.type !== 'done') send(event);
           },
-          { createIfMissing: true }
+          { createIfMissing: true, signal: req.signal }
         );
 
         send({

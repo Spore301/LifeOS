@@ -71,7 +71,7 @@ export async function streamToChat(
   chatId: string,
   userText: string,
   onEvent: (event: AgentStreamEvent) => void,
-  opts: { createIfMissing?: boolean } = {}
+  opts: { createIfMissing?: boolean; signal?: AbortSignal } = {}
 ): Promise<ChatReply> {
   const record = getChatRecord(userId, chatId);
   if (!record && opts.createIfMissing === false) {
@@ -94,7 +94,7 @@ export async function streamToChat(
     info.sessionId,
     info.directory,
     userText,
-    { resume },
+    { resume, signal: opts.signal },
     onEvent
   );
 
