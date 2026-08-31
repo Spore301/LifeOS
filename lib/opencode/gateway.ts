@@ -3,6 +3,7 @@ import { SYSTEM_PROMPT, SESSION_RESUME_PROMPT } from './prompts';
 import { chatDir, ensureDir, writeText, readText } from '../store/paths';
 import { getPersona } from '../store/persona';
 import { formatInZone, getTimeZone } from '../timezone';
+import { issueAgentToken } from '../store/agentTokens';
 
 /**
  * Thin, resilient wrapper around the OpenCode SDK server.
@@ -19,10 +20,6 @@ const OPENCODE_BASE_URL =
 // its own container, where "localhost" is NOT the Next.js app - compose sets this to
 // the compose service name (http://lifeos:3000). Defaults to localhost for bare-metal dev.
 const API_BASE_URL = process.env.LIFEOS_API_BASE_URL || 'http://localhost:3000';
-
-// Production builds only trust X-LifeOS-User when it comes with this shared secret,
-// so the agent must send it alongside the user header (see lib/auth-user.ts).
-const ADMIN_SECRET = process.env.LIFEOS_ADMIN_SECRET || '';
 
 // Model selection. Prefer env, fall back to the LifeOS default ("big pickle").
 // Values are documented in .env.example. Example: OPENCODE_PROVIDER=opencode, OPENCODE_MODEL=big-pickle
@@ -136,10 +133,8 @@ export async function sendChatMessage(
   preamble += `Call every /api/... route against THAT base URL exactly as given. Do not substitute localhost: you run in a different container from the API, so localhost is not the LifeOS app.\n`;
   preamble += `On EVERY /api request you MUST send these headers, or the backend rejects you (401) or falls back to a stub user with no calendar:\n`;
   preamble += `  X-LifeOS-User: ${userId}\n`;
-  if (ADMIN_SECRET) {
-    preamble += `  X-LifeOS-Admin: ${ADMIN_SECRET}\n`;
-    preamble += `The X-LifeOS-Admin value is a server credential. Send it in request headers only; never print it, echo it back, or write it into a file.\n`;
-  }
+  preamble += `  X-LifeOS-Agent: ${issueAgentToken(userId, chatId)}\n`;
+  preamble += `That agent token authorises YOUR account only and expires daily. Send it in request headers only; never print it or write it to a file.\n`;
   preamble += `\n`;
 
   if (opts.resume) {
@@ -228,20 +223,12 @@ function extractReplyText(res: any): string {
   return '(no text reply)';
 }
 
+// The workspace is shared ground for every chat container-side, so AGENTS.md carries
+// only the generic system prompt. The persona is per-user and goes in the per-message
+// preamble instead, where it never touches disk in an agent-readable location.
 function writeAgentsMd(userId: string, dir: string): void {
   const existing = readText(`${dir}/AGENTS.md`, '');
   // Refuse to overwrite any hand-authored customisations, but seed if absent.
   if (existing.trim()) return;
-  const persona = getPersona(userId);
-  writeText(
-    `${dir}/AGENTS.md`,
-    `${SYSTEM_PROMPT}
-
----
-
-## User persona (long-term memory)
-
-${persona}
-`
-  );
+  writeText(`${dir}/AGENTS.md`, SYSTEM_PROMPT);
 }

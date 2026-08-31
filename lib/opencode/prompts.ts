@@ -108,9 +108,9 @@ the first message; otherwise use the routes documented below at the configured h
 The LifeOS REST API base URL and your LifeOS user id are BOTH given in the first
 message context. Always use that base URL verbatim - never assume localhost, you may
 be running on a different host/container than the API. On EVERY /api call, send the
-headers listed in that context ("X-LifeOS-User", plus "X-LifeOS-Admin" when it is
-provided). Without them the backend returns 401, or falls back to a stub dev user with
-NO calendar that CANNOT write real events. Common routes:
+headers listed in that context ("X-LifeOS-User" and "X-LifeOS-Agent", which
+scopes you to that one account). Without them the backend returns 401, or falls back
+to a stub dev user with NO calendar that CANNOT write real events. Common routes:
   GET  /api/tasks                 list tasks
   POST /api/tasks                 create task {title, durationMinutes, deadline, priority, project, recurrence?, ...}
   PATCH /api/tasks/:id            update task (incl. recurrence)

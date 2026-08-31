@@ -29,6 +29,13 @@ const DATA_ROOT = process.env.LIFEOS_DATA_DIR || path.join(process.cwd(), 'data'
  */
 const SECRETS_ROOT = process.env.LIFEOS_SECRETS_DIR || path.join(process.cwd(), 'secrets');
 
+/**
+ * Chat workspaces: the only tree the OpenCode agent container mounts. Keeping it
+ * separate from DATA_ROOT means an agent with shell access cannot read another
+ * user's tasks, persona or transcripts straight off disk.
+ */
+const WORKSPACE_ROOT = process.env.LIFEOS_WORKSPACE_DIR || path.join(process.cwd(), 'workspaces');
+
 export function ensureDir(dir: string): void {
   fs.mkdirSync(dir, { recursive: true });
 }
@@ -37,7 +44,13 @@ export function userDir(userId: string): string {
   return path.join(DATA_ROOT, 'users', sanitize(userId));
 }
 
+/** Agent working directory for a chat. Agent-visible - keep user data OUT of it. */
 export function chatDir(userId: string, chatId: string): string {
+  return path.join(WORKSPACE_ROOT, 'users', sanitize(userId), 'chats', sanitize(chatId));
+}
+
+/** App-side storage for a chat (transcripts). Never mounted by the agent container. */
+export function chatDataDir(userId: string, chatId: string): string {
   return path.join(userDir(userId), 'chats', sanitize(chatId));
 }
 

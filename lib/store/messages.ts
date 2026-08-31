@@ -1,4 +1,4 @@
-import { chatDir, readJson, writeJson } from './paths';
+import { chatDataDir, readJson, writeJson } from './paths';
 
 export interface StoredChatMessage {
   id: string;
@@ -15,7 +15,7 @@ interface Transcript {
 const empty = (): Transcript => ({ messages: [] });
 
 function fileFor(userId: string, chatId: string): string {
-  return `${chatDir(userId, chatId)}/transcript.json`;
+  return `${chatDataDir(userId, chatId)}/transcript.json`;
 }
 
 function transcript(userId: string, chatId: string): Transcript {
