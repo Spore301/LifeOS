@@ -1,4 +1,5 @@
 import { Task, TimeSlot, ScheduledTask, ProposedSchedule, Priority } from './types';
+import { getTimeZone, zonedWallClock } from './timezone';
 
 interface WorkHours {
   startHour: number; // e.g. 9 for 09:00
@@ -24,7 +25,8 @@ export function calculateProposedSchedule(
   tasks: Task[],
   existingBusySlots: TimeSlot[] = [],
   workHours: WorkHours = DEFAULT_WORK_HOURS,
-  targetDate: Date = new Date()
+  targetDate: Date = new Date(),
+  timeZone: string = getTimeZone()
 ): ProposedSchedule {
   const conflictWarnings: string[] = [];
   const scheduledTasks: ScheduledTask[] = [];
@@ -47,12 +49,10 @@ export function calculateProposedSchedule(
     (a, b) => PRIORITY_WEIGHT[b.priority] - PRIORITY_WEIGHT[a.priority]
   );
 
-  // Generate available working intervals for targetDate
-  const dayStart = new Date(targetDate);
-  dayStart.setHours(workHours.startHour, 0, 0, 0);
-
-  const dayEnd = new Date(targetDate);
-  dayEnd.setHours(workHours.endHour, 0, 0, 0);
+  // Working window, anchored to the USER's wall clock. setHours() here would use the
+  // server's local zone (UTC in the container), which put a "09:00" block at 14:30 IST.
+  const dayStart = zonedWallClock(targetDate, workHours.startHour, 0, timeZone);
+  const dayEnd = zonedWallClock(targetDate, workHours.endHour, 0, timeZone);
 
   // If target date is today and now is within work hours, start search from current time rounded up
   const now = new Date();

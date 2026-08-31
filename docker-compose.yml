@@ -1,0 +1,67 @@
+services:
+  lifeos:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_WORK_START: ${NEXT_PUBLIC_WORK_START:-09:00}
+        NEXT_PUBLIC_WORK_END: ${NEXT_PUBLIC_WORK_END:-18:00}
+    environment:
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      OPENCODE_BASE_URL: http://opencode:4096
+      # Base URL the opencode AGENT calls back on. Must be the compose service name:
+      # inside the opencode container, localhost is NOT this app.
+      LIFEOS_API_BASE_URL: http://lifeos:3000
+      OPENCODE_PROVIDER: ${OPENCODE_PROVIDER:-opencode}
+      OPENCODE_MODEL: ${OPENCODE_MODEL:-big-pickle}
+      # Shared basic-auth credentials for the opencode server. Sourced from .env so
+      # the app and the server ALWAYS read the SAME value, and so a machine-level
+      # OPENCODE_* var (e.g. from the opencode desktop app) cannot cause a mismatch.
+      OPENCODE_SERVER_USERNAME: ${OPENCODE_SERVER_USERNAME:-opencode}
+      OPENCODE_SERVER_PASSWORD: ${OPENCODE_SERVER_PASSWORD:?set OPENCODE_SERVER_PASSWORD in .env}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      WHISPER_CUSTOM_URL: ${WHISPER_CUSTOM_URL:-}
+      # Scheduling timezone. LIFEOS_TIMEZONE drives the wall-clock maths; TZ keeps
+      # any remaining Date locals (and log timestamps) in the same zone.
+      LIFEOS_TIMEZONE: ${LIFEOS_TIMEZONE:-Asia/Kolkata}
+      TZ: ${LIFEOS_TIMEZONE:-Asia/Kolkata}
+      LIFEOS_DATA_DIR: /app/data
+      LIFEOS_ADMIN_SECRET: ${LIFEOS_ADMIN_SECRET:-replace_with_a_long_random_string}
+      LIFEOS_DEV_USER: ${LIFEOS_DEV_USER:-local-dev-user}
+      LIFEOS_CRON_SECRET: ${LIFEOS_CRON_SECRET:-}
+      LIFEOS_QUIET_START: ${LIFEOS_QUIET_START:-22}
+      LIFEOS_QUIET_END: ${LIFEOS_QUIET_END:-8}
+    volumes:
+      - lifeos-data:/app/data
+    ports:
+      - "3000:3000"
+    depends_on:
+      - opencode
+    restart: unless-stopped
+
+  opencode:
+    build:
+      context: ./opencode
+    environment:
+      # Same credentials as the app side above, both sourced from .env so the two
+      # ALWAYS agree and a machine-level OPENCODE_* var cannot desync them.
+      OPENCODE_SERVER_USERNAME: ${OPENCODE_SERVER_USERNAME:-opencode}
+      OPENCODE_SERVER_PASSWORD: ${OPENCODE_SERVER_PASSWORD:?set OPENCODE_SERVER_PASSWORD in .env}
+      # Provider API keys seeded into the container's own auth.json on first start.
+      ZAI_CODING_PLAN_KEY: ${ZAI_CODING_PLAN_KEY:-}
+      OPENROUTER_KEY: ${OPENROUTER_KEY:-}
+    volumes:
+      # Shared LifeOS data volume so both containers see the same chat workspace
+      # paths (/app/data/users/.../chats/...) that the app hands to opencode.
+      - lifeos-data:/app/data
+      # opencode's own isolated state (auth.json, session db, repos). NOT the host's
+      # live opencode data dir, which the opencode desktop app uses separately.
+      - opencode-data:/root/.local/share/opencode
+    restart: unless-stopped
+
+volumes:
+  lifeos-data:
+  opencode-data:

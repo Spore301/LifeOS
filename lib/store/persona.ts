@@ -21,3 +21,26 @@ export function setPersona(userId: string, content: string): void {
   const body = content.trim().startsWith(PERSONA_HEADER) ? content : `${PERSONA_HEADER}\n\n${content.trim()}`;
   writeText(personaFile(userId), body + '\n');
 }
+
+
+/**
+ * Append a durable fact the user stated ("always schedule me in IST") so it
+ * survives across chat sessions. Deduplicates on the exact bullet text, so a
+ * user repeating a preference does not grow the file without bound.
+ */
+export function appendPersona(userId: string, fact: string): string {
+  const line = fact.trim();
+  if (!line) return getPersona(userId);
+
+  const bullet = line.startsWith('- ') ? line : `- ${line}`;
+  const current = getPersona(userId);
+  if (current.includes(bullet)) return current;
+
+  const heading = '## Stated preferences';
+  const next = current.includes(heading)
+    ? current.replace(heading, `${heading}\n${bullet}`)
+    : `${current.trimEnd()}\n\n${heading}\n${bullet}`;
+
+  setPersona(userId, next);
+  return next;
+}

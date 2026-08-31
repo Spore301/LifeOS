@@ -1,7 +1,8 @@
 import { calculateProposedSchedule } from './scheduler';
 import { getTasks } from './store/tasks';
 import { Task as SchedulerTask, ProposedSchedule } from './types';
-import { fetchGoogleFreeBusy, writeTaskToGoogleCalendar } from './calendar';
+import { fetchGoogleFreeBusy, writeTaskToGoogleCalendar, deleteTaskFromGoogleCalendar } from './calendar';
+import { getTimeZone, zonedDayBounds } from './timezone';
 import { getAccessToken } from './google-auth';
 
 /**
@@ -53,17 +54,18 @@ export async function proposeToday(userId: string): Promise<AgendaProposal> {
   const tasks = toSchedulerTasks(userId);
   const token = await accessToken(userId);
 
-  const today = new Date();
-  const timeMin = new Date(today).setHours(0, 0, 0, 0);
-  const timeMax = new Date(today).setHours(23, 59, 59, 999);
+  const timeZone = getTimeZone();
+  // The FreeBusy window is the user's calendar day, not the server's. setHours(0)
+  // in a UTC container asked Google for 05:30 IST -> 05:29 IST the next morning.
+  const { start: dayStart, end: dayEnd } = zonedDayBounds(new Date(), timeZone);
 
   const busySlots = await fetchGoogleFreeBusy(
     token,
-    new Date(timeMin).toISOString(),
-    new Date(timeMax).toISOString()
+    dayStart.toISOString(),
+    dayEnd.toISOString()
   );
 
-  const result = calculateProposedSchedule(tasks, busySlots);
+  const result = calculateProposedSchedule(tasks, busySlots, undefined, new Date(), timeZone);
 
   return {
     scheduled: result.scheduledTasks,
@@ -93,4 +95,14 @@ export async function confirmWrite(userId: string, scheduledTasks: ProposedSched
     count: written.length,
     mocked: !token,
   };
+}
+
+/**
+ * Remove a task's block from Google Calendar (task dropped or rescheduled away).
+ */
+export async function removeFromCalendar(userId: string, taskId: string) {
+  const token = await accessToken(userId);
+  if (!token) return { removed: false, mocked: true };
+  const removed = await deleteTaskFromGoogleCalendar(token, taskId);
+  return { removed, mocked: false };
 }
