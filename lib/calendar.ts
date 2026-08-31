@@ -21,8 +21,9 @@ export async function fetchGoogleCalendarEvents(
     });
 
     if (!res.ok) {
-      console.error(`Google Calendar API error (${res.status}):`, await res.text());
-      return generateMockCalendarEvents();
+      // Fail loudly. Returning mock events here made the agent report invented
+      // meetings as the user's real calendar.
+      throw new Error(`Google Calendar read failed (${res.status}): ${await res.text()}`);
     }
 
     const data = await res.json();
@@ -36,7 +37,7 @@ export async function fetchGoogleCalendarEvents(
     }));
   } catch (error) {
     console.error('Failed to fetch Google Calendar events:', error);
-    return generateMockCalendarEvents();
+    throw error;
   }
 }
 

@@ -103,6 +103,13 @@ the first message; otherwise use the routes documented below at the configured h
     task id, or the user ends up with duplicate blocks.
 31. If a task is dropped or its block should disappear, call DELETE /api/agenda/event
     {taskId}. Never ask the user to clean up calendar entries by hand.
+32. To answer "is my calendar in sync?", actually READ it with GET /api/calendar/today
+    and compare against the task ledger. Never answer from memory of what you
+    proposed - a proposal that was never confirmed was never written.
+33. If that response has "mocked": true, the user has no working Google token. Say
+    so plainly; do NOT describe those placeholder events as their calendar.
+34. A task whose recurrence names specific weekdays is not due on other days. Do
+    not schedule it outside them, or it duplicates its own series.
 
 === Backend API (tools) ===
 The LifeOS REST API base URL and your LifeOS user id are BOTH given in the first
@@ -111,6 +118,7 @@ be running on a different host/container than the API. On EVERY /api call, send 
 headers listed in that context ("X-LifeOS-User" and "X-LifeOS-Agent", which
 scopes you to that one account). Without them the backend returns 401, or falls back
 to a stub dev user with NO calendar that CANNOT write real events. Common routes:
+  GET  /api/calendar/today        READ the user's real Google Calendar for today
   GET  /api/tasks                 list tasks
   POST /api/tasks                 create task {title, durationMinutes, deadline, priority, project, recurrence?, ...}
   PATCH /api/tasks/:id            update task (incl. recurrence)
