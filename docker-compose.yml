@@ -29,13 +29,17 @@ services:
       LIFEOS_TIMEZONE: ${LIFEOS_TIMEZONE:-Asia/Kolkata}
       TZ: ${LIFEOS_TIMEZONE:-Asia/Kolkata}
       LIFEOS_DATA_DIR: /app/data
-      LIFEOS_ADMIN_SECRET: ${LIFEOS_ADMIN_SECRET:-replace_with_a_long_random_string}
+      # Credentials root. Mounted ONLY by this service - the opencode container must
+      # never see it, because the agent can run file tools inside what it can mount.
+      LIFEOS_SECRETS_DIR: /app/secrets
+      LIFEOS_ADMIN_SECRET: ${LIFEOS_ADMIN_SECRET:?set a long random LIFEOS_ADMIN_SECRET in .env}
       LIFEOS_DEV_USER: ${LIFEOS_DEV_USER:-local-dev-user}
       LIFEOS_CRON_SECRET: ${LIFEOS_CRON_SECRET:-}
       LIFEOS_QUIET_START: ${LIFEOS_QUIET_START:-22}
       LIFEOS_QUIET_END: ${LIFEOS_QUIET_END:-8}
     volumes:
       - lifeos-data:/app/data
+      - lifeos-secrets:/app/secrets
     ports:
       - "3000:3000"
     depends_on:
@@ -63,5 +67,6 @@ services:
     restart: unless-stopped
 
 volumes:
+  lifeos-secrets:
   lifeos-data:
   opencode-data:

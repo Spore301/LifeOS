@@ -1,3 +1,8 @@
+
+/** Per-user credential directory, deliberately outside the agent-visible data root. */
+export function userSecretsDir(userId: string): string {
+  return path.join(SECRETS_ROOT, 'users', sanitize(userId));
+}
 import fs from 'fs';
 import path from 'path';
 
@@ -15,6 +20,14 @@ import path from 'path';
  *         ...
  */
 const DATA_ROOT = process.env.LIFEOS_DATA_DIR || path.join(process.cwd(), 'data');
+
+/**
+ * Credentials live OUTSIDE the data root. The opencode agent container mounts the
+ * data volume (it needs the per-chat workspaces) and can run file tools there, so a
+ * Google refresh token sitting in the user's data folder was readable by the model.
+ * This root is mounted only by the app.
+ */
+const SECRETS_ROOT = process.env.LIFEOS_SECRETS_DIR || path.join(process.cwd(), 'secrets');
 
 export function ensureDir(dir: string): void {
   fs.mkdirSync(dir, { recursive: true });

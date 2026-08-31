@@ -11,7 +11,10 @@ import { deliverReminder } from '@/lib/notifications';
 export async function POST(req: NextRequest) {
   const cronSecret = process.env.LIFEOS_CRON_SECRET;
   const header = req.headers.get('x-lifeos-cron');
-  if (cronSecret && header !== cronSecret) {
+  // Fail CLOSED: an unset secret used to skip the check entirely, leaving this route
+  // open to anyone - and userId comes from the query string, so any user could be
+  // targeted. No secret configured now means the route is disabled, not public.
+  if (!cronSecret || header !== cronSecret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

@@ -28,7 +28,7 @@ export async function resolveUserId(req: NextRequest): Promise<string | null> {
 
   if (process.env.NODE_ENV !== 'production') {
     if (headerUser) return headerUser;
-  } else if (headerUser && devSecret && headerSecret && headerSecret === devSecret) {
+  } else if (headerUser && isUsableAdminSecret(devSecret) && headerSecret === devSecret) {
     return headerUser;
   }
 
@@ -38,4 +38,17 @@ export async function resolveUserId(req: NextRequest): Promise<string | null> {
   }
 
   return null;
+}
+
+
+// Values that must never be accepted as a real credential: an unset secret, or the
+// placeholder shipped in docker-compose/.env.example. Without this check a deployment
+// that never set the variable would accept the published default and let any caller
+// impersonate any user via X-LifeOS-User.
+const PLACEHOLDER_SECRETS = new Set(['', 'replace_with_a_long_random_string', 'changeme']);
+
+function isUsableAdminSecret(secret?: string): secret is string {
+  if (!secret) return false;
+  if (PLACEHOLDER_SECRETS.has(secret)) return false;
+  return secret.length >= 24;
 }

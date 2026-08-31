@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { resolveUserId } from '@/lib/auth-user';
 import { parseTranscriptWithDeepSeek } from '@/lib/deepseek';
 
 export async function POST(req: NextRequest) {
+  // This route spends credit on a third-party API, so it must never run for an
+  // unauthenticated caller - it was previously an open proxy onto the billing key.
+  const userId = await resolveUserId(req);
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   try {
     const body = await req.json();
     const { transcript, historySummary } = body;
