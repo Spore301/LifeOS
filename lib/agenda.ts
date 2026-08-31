@@ -1,7 +1,12 @@
 import { calculateProposedSchedule } from './scheduler';
 import { getTasks } from './store/tasks';
 import { Task as SchedulerTask, ProposedSchedule } from './types';
-import { fetchGoogleFreeBusy, writeTaskToGoogleCalendar, deleteTaskFromGoogleCalendar } from './calendar';
+import {
+  fetchGoogleFreeBusy,
+  fetchGoogleCalendarEvents,
+  writeTaskToGoogleCalendar,
+  deleteTaskFromGoogleCalendar,
+} from './calendar';
 import { getTimeZone, zonedDayBounds } from './timezone';
 import { getAccessToken } from './google-auth';
 
@@ -95,6 +100,74 @@ export async function confirmWrite(userId: string, scheduledTasks: ProposedSched
     count: written.length,
     mocked: !token,
   };
+}
+
+export interface CalendarAnomaly {
+  eventId?: string;
+  taskId: string;
+  summary?: string;
+  start?: string;
+  reason: string;
+}
+
+/**
+ * Compare today's calendar against the task ledger and report blocks that should
+ * not be there.
+ *
+ * A LifeOS event whose task has since been deleted or replaced stays on the
+ * calendar but is invisible to planning, because the planner only looks at the
+ * ledger. That is how a stale 9:00 AM block survived alongside its replacement
+ * and read to the user as a duplicate. Completed tasks are deliberately NOT
+ * flagged: a finished block in the past is legitimate history.
+ */
+export async function reconcileToday(userId: string) {
+  const token = await accessToken(userId);
+  if (!token) {
+    return { mocked: true, anomalies: [] as CalendarAnomaly[], checked: 0 };
+  }
+
+  const timeZone = getTimeZone();
+  const { start, end } = zonedDayBounds(new Date(), timeZone);
+  const events = await fetchGoogleCalendarEvents(
+    token,
+    start.toISOString(),
+    end.toISOString()
+  );
+
+  const byId = new Map(getTasks(userId).map((t) => [t.id, t]));
+  const anomalies: CalendarAnomaly[] = [];
+  const seen = new Map<string, number>();
+
+  const managed = events.filter((e) => e.extendedProperties?.private?.lifeos_task_id);
+
+  for (const evt of managed) {
+    const taskId = evt.extendedProperties!.private!.lifeos_task_id as string;
+    const entry: CalendarAnomaly = {
+      eventId: evt.id,
+      taskId,
+      summary: evt.summary,
+      start: evt.start?.dateTime || evt.start?.date,
+      reason: '',
+    };
+
+    const count = (seen.get(taskId) || 0) + 1;
+    seen.set(taskId, count);
+    if (count > 1) {
+      anomalies.push({ ...entry, reason: 'duplicate block for the same task' });
+      continue;
+    }
+
+    const task = byId.get(taskId);
+    if (!task) {
+      anomalies.push({ ...entry, reason: 'task no longer exists in the ledger' });
+    } else if (task.state === 'deferred') {
+      anomalies.push({ ...entry, reason: 'task was deferred but still has a block' });
+    } else if (task.isBlocked || task.state === 'blocked') {
+      anomalies.push({ ...entry, reason: 'task is blocked but still has a block' });
+    }
+  }
+
+  return { mocked: false, anomalies, checked: managed.length };
 }
 
 /**

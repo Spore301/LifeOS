@@ -1,5 +1,6 @@
 import { Task, TimeSlot, ScheduledTask, ProposedSchedule, Priority } from './types';
 import { getTimeZone, zonedWallClock } from './timezone';
+import { isDueOn } from './recurrence';
 
 interface WorkHours {
   startHour: number; // e.g. 9 for 09:00
@@ -34,8 +35,19 @@ export function calculateProposedSchedule(
   const bumpedTasks: Task[] = [];
 
   // Filter out blocked tasks from immediate scheduling
-  const activeTasks = tasks.filter(t => !t.isBlocked);
+  const unblocked = tasks.filter(t => !t.isBlocked);
   const blockedTasks = tasks.filter(t => t.isBlocked);
+
+  // A recurring task only belongs on the days its rule names. Without this a
+  // routine set to BYDAY=TU,TH,SU was also booked today, duplicating its series.
+  const activeTasks = unblocked.filter(t => isDueOn(t.recurrence, targetDate, timeZone));
+  for (const t of unblocked) {
+    if (!activeTasks.includes(t)) {
+      conflictWarnings.push(
+        `Task "${t.title}" recurs on other days (${t.recurrence}) and is not due today.`
+      );
+    }
+  }
 
   if (blockedTasks.length > 0) {
     blockedTasks.forEach(bt => {

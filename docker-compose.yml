@@ -6,7 +6,9 @@ services:
         NEXT_PUBLIC_WORK_START: ${NEXT_PUBLIC_WORK_START:-09:00}
         NEXT_PUBLIC_WORK_END: ${NEXT_PUBLIC_WORK_END:-18:00}
     environment:
-      NEXTAUTH_URL: http://localhost:3000
+      # Public origin the app is reached on. MUST match the URL in the browser and the
+      # redirect URI registered in Google Cloud Console, or Google sign-in fails.
+      NEXTAUTH_URL: ${PUBLIC_URL:-http://localhost:3000}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
@@ -29,13 +31,19 @@ services:
       LIFEOS_TIMEZONE: ${LIFEOS_TIMEZONE:-Asia/Kolkata}
       TZ: ${LIFEOS_TIMEZONE:-Asia/Kolkata}
       LIFEOS_DATA_DIR: /app/data
-      LIFEOS_ADMIN_SECRET: ${LIFEOS_ADMIN_SECRET:-replace_with_a_long_random_string}
+      LIFEOS_WORKSPACE_DIR: /app/workspaces
+      # Credentials root. Mounted ONLY by this service - the opencode container must
+      # never see it, because the agent can run file tools inside what it can mount.
+      LIFEOS_SECRETS_DIR: /app/secrets
+      LIFEOS_ADMIN_SECRET: ${LIFEOS_ADMIN_SECRET:?set a long random LIFEOS_ADMIN_SECRET in .env}
       LIFEOS_DEV_USER: ${LIFEOS_DEV_USER:-local-dev-user}
       LIFEOS_CRON_SECRET: ${LIFEOS_CRON_SECRET:-}
       LIFEOS_QUIET_START: ${LIFEOS_QUIET_START:-22}
       LIFEOS_QUIET_END: ${LIFEOS_QUIET_END:-8}
     volumes:
       - lifeos-data:/app/data
+      - lifeos-secrets:/app/secrets
+      - lifeos-workspaces:/app/workspaces
     ports:
       - "3000:3000"
     depends_on:
@@ -54,14 +62,17 @@ services:
       ZAI_CODING_PLAN_KEY: ${ZAI_CODING_PLAN_KEY:-}
       OPENROUTER_KEY: ${OPENROUTER_KEY:-}
     volumes:
-      # Shared LifeOS data volume so both containers see the same chat workspace
-      # paths (/app/data/users/.../chats/...) that the app hands to opencode.
-      - lifeos-data:/app/data
+      # ONLY the chat workspaces. User data (tasks, persona, transcripts) and
+      # credentials stay on volumes this container cannot see, so an agent with
+      # shell access cannot read another user off disk.
+      - lifeos-workspaces:/app/workspaces
       # opencode's own isolated state (auth.json, session db, repos). NOT the host's
       # live opencode data dir, which the opencode desktop app uses separately.
       - opencode-data:/root/.local/share/opencode
     restart: unless-stopped
 
 volumes:
+  lifeos-workspaces:
+  lifeos-secrets:
   lifeos-data:
   opencode-data:

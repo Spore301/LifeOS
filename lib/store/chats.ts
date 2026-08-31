@@ -3,6 +3,9 @@ import { userDir, readJson, writeJson, nowIso } from './paths';
 export interface ChatRecord {
   chatId: string;
   sessionId?: string; // opencode session id
+  /** Working directory the opencode session was created with. If the layout moves,
+   *  a session bound to the old path can no longer run and must be recreated. */
+  sessionDirectory?: string;
   title?: string;
   directory?: string;
   createdAt: string;
@@ -76,10 +79,16 @@ export function getOrCreateChat(
   return rec;
 }
 
-export function setSessionId(userId: string, chatId: string, sessionId: string): void {
+export function setSessionId(
+  userId: string,
+  chatId: string,
+  sessionId: string,
+  sessionDirectory?: string
+): void {
   const reg = registry(userId);
   if (reg.chats[chatId]) {
     reg.chats[chatId].sessionId = sessionId;
+    if (sessionDirectory) reg.chats[chatId].sessionDirectory = sessionDirectory;
     reg.chats[chatId].updatedAt = nowIso();
     save(userId, reg);
   }

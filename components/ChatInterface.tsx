@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, MicOff, Send, Loader2, Bot, User } from 'lucide-react';
+import { Mic, MicOff, Send, Loader2, Bot, User, Check, X } from 'lucide-react';
 import Markdown from './Markdown';
 
 export interface UiChatMessage {
@@ -11,12 +11,41 @@ export interface UiChatMessage {
   timestamp?: string;
 }
 
+/** A tool call the agent is making, surfaced live so the wait is legible. */
+export interface AgentStep {
+  id: string;
+  tool: string;
+  title?: string;
+  status: string;
+}
+
 interface ChatInterfaceProps {
   chatId: string | null;
   messages: UiChatMessage[];
   onSend: (text: string) => void;
   isProcessing: boolean;
   isChatLoading: boolean;
+  /** Assistant text received so far for the in-flight reply. */
+  streamingText?: string;
+  /** Tool calls for the in-flight reply, in the order they started. */
+  steps?: AgentStep[];
+}
+
+/** Turn a tool name into something worth reading while you wait. */
+function stepLabel(step: AgentStep): string {
+  const byTool: Record<string, string> = {
+    bash: 'Running a command',
+    read: 'Reading',
+    write: 'Writing',
+    edit: 'Editing',
+    webfetch: 'Calling LifeOS',
+    glob: 'Searching',
+    grep: 'Searching',
+    list: 'Listing files',
+    task: 'Working',
+  };
+  const base = byTool[step.tool?.toLowerCase()] || step.tool || 'Working';
+  return step.title ? `${base}: ${step.title}` : base;
 }
 
 export default function ChatInterface({
@@ -25,6 +54,8 @@ export default function ChatInterface({
   onSend,
   isProcessing,
   isChatLoading,
+  streamingText = '',
+  steps = [],
 }: ChatInterfaceProps) {
   const [textInput, setTextInput] = useState('');
   const [isRecording, setIsRecording] = useState(false);
@@ -228,9 +259,45 @@ export default function ChatInterface({
             <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white flex-shrink-0 mt-0.5 shadow-sm">
               <Bot className="w-4 h-4" />
             </div>
-            <div className="bg-white border border-slate-200 text-slate-400 rounded-2xl rounded-bl-none px-4 py-3 text-xs shadow-sm flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Thinking...
+            <div className="max-w-[85%] bg-white border border-slate-200 rounded-2xl rounded-bl-none px-4 py-3 shadow-sm">
+              {steps.length > 0 && (
+                <ul className="mb-2 space-y-1">
+                  {steps.map((step) => {
+                    const done = step.status === 'completed';
+                    const failed = step.status === 'error';
+                    return (
+                      <li
+                        key={step.id}
+                        className={`flex items-center gap-2 text-[11px] ${
+                          failed ? 'text-rose-500' : done ? 'text-slate-400' : 'text-slate-600'
+                        }`}
+                      >
+                        {done ? (
+                          <Check className="w-3 h-3 flex-shrink-0" />
+                        ) : failed ? (
+                          <X className="w-3 h-3 flex-shrink-0" />
+                        ) : (
+                          <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" />
+                        )}
+                        <span className="truncate">{stepLabel(step)}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+
+              {streamingText ? (
+                <div className="text-sm leading-relaxed text-slate-800">
+                  <Markdown variant="light">{streamingText}</Markdown>
+                </div>
+              ) : (
+                steps.length === 0 && (
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Thinking...
+                  </div>
+                )
+              )}
             </div>
           </div>
         )}

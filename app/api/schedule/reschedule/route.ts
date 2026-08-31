@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveUserId } from '@/lib/auth-user';
+import { getTimeZone, zonedDayBounds } from '@/lib/timezone';
 import { getAccessToken } from '@/lib/google-auth';
 import { fetchGoogleFreeBusy } from '@/lib/calendar';
 import { calculateProposedSchedule } from '@/lib/scheduler';
@@ -26,9 +27,11 @@ export async function PATCH(req: NextRequest) {
       });
     }
 
-    const today = new Date();
-    const timeMin = new Date(today.setHours(0, 0, 0, 0)).toISOString();
-    const timeMax = new Date(today.setHours(23, 59, 59, 999)).toISOString();
+    // The day window is the USER's calendar day. setHours() here is server-local
+    // (UTC in the container), which asked Google for 05:30 IST -> 05:29 next day.
+    const bounds = zonedDayBounds(new Date(), getTimeZone());
+    const timeMin = bounds.start.toISOString();
+    const timeMax = bounds.end.toISOString();
 
     const busySlots = await fetchGoogleFreeBusy(accessToken, timeMin, timeMax);
     const rescheduledPlan = calculateProposedSchedule(updatedTasks, busySlots);

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Header from '@/components/Header';
-import ChatInterface, { UiChatMessage } from '@/components/ChatInterface';
+import ChatInterface, { UiChatMessage, AgentStep } from '@/components/ChatInterface';
 import ChatSidebar, { ChatListItem } from '@/components/ChatSidebar';
 import ReminderToast, { DueReminderUi } from '@/components/ReminderToast';
 import { CalendarEvent } from '@/lib/types';
@@ -53,6 +53,9 @@ export default function Home() {
   const [isChatsLoading, setIsChatsLoading] = useState(false);
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  // Live view of the in-flight reply: text as it arrives, and the tool steps behind it.
+  const [streamingText, setStreamingText] = useState('');
+  const [steps, setSteps] = useState<AgentStep[]>([]);
   const [existingEvents, setExistingEvents] = useState<CalendarEvent[]>([]);
   const [showCalendarPreview, setShowCalendarPreview] = useState(false);
   const [dueReminders, setDueReminders] = useState<DueReminderUi[]>([]);
@@ -175,29 +178,96 @@ export default function Home() {
       };
       setChatMessages((prev) => ({ ...prev, [chatId!]: [...(prev[chatId!] || []), userMsg] }));
 
-      const res = await fetch(`/api/chat/${chatId}/message`, {
+      setStreamingText('');
+      setSteps([]);
+
+      const res = await fetch(`/api/chat/${chatId}/message/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       });
-      const data = await res.json();
 
-      if (!res.ok) {
+      if (!res.ok || !res.body) {
+        let detail = 'unknown error';
+        try {
+          const data = await res.json();
+          detail = data.error || data.detail || detail;
+        } catch {
+          // non-JSON error body
+        }
         const errMsg: UiChatMessage = {
           id: `err-${Date.now()}`,
           sender: 'assistant',
-          content: `Sorry, the assistant could not respond: ${data.error || data.detail || 'unknown error'}`,
+          content: `Sorry, the assistant could not respond: ${detail}`,
           timestamp: new Date().toISOString(),
         };
         setChatMessages((prev) => ({ ...prev, [chatId!]: [...(prev[chatId!] || []), errMsg] }));
         return;
       }
 
-      // Use the authoritative transcript returned by the server.
-      setChatMessages((prev) => ({
-        ...prev,
-        [chatId!]: normalizeMessages(data.transcript),
-      }));
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let streamed = '';
+
+      // SSE frames are separated by a blank line; a chunk can split one in half,
+      // so keep the tail in the buffer until its terminator arrives.
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const frames = buffer.split('\n\n');
+        buffer = frames.pop() || '';
+
+        for (const frame of frames) {
+          const line = frame.split('\n').find((l) => l.startsWith('data: '));
+          if (!line) continue;
+
+          let event: any;
+          try {
+            event = JSON.parse(line.slice(6));
+          } catch {
+            continue;
+          }
+
+          if (event.type === 'text') {
+            streamed += event.delta;
+            setStreamingText(streamed);
+          } else if (event.type === 'step') {
+            setSteps((prev) => {
+              const idx = prev.findIndex((s) => s.id === event.id);
+              const next: AgentStep = {
+                id: event.id,
+                tool: event.tool,
+                title: event.title,
+                status: event.status,
+              };
+              if (idx === -1) return [...prev, next];
+              const copy = [...prev];
+              copy[idx] = next;
+              return copy;
+            });
+          } else if (event.type === 'done') {
+            // Server transcript is authoritative; it supersedes what we streamed.
+            setChatMessages((prev) => ({
+              ...prev,
+              [chatId!]: normalizeMessages(event.transcript),
+            }));
+          } else if (event.type === 'error') {
+            const errMsg: UiChatMessage = {
+              id: `err-${Date.now()}`,
+              sender: 'assistant',
+              content: `Sorry, the assistant could not respond: ${event.message}`,
+              timestamp: new Date().toISOString(),
+            };
+            setChatMessages((prev) => ({
+              ...prev,
+              [chatId!]: [...(prev[chatId!] || []), errMsg],
+            }));
+          }
+        }
+      }
     } catch (e: any) {
       console.error('Send error:', e);
       const chatId = activeChatId;
@@ -213,6 +283,9 @@ export default function Home() {
     } finally {
       processingRef.current = false;
       setIsProcessing(false);
+      // The finished reply now lives in the transcript, so drop the live view.
+      setStreamingText('');
+      setSteps([]);
     }
   };
 
@@ -269,6 +342,8 @@ export default function Home() {
           onSend={handleSend}
           isProcessing={isProcessing}
           isChatLoading={isChatLoading}
+          streamingText={streamingText}
+          steps={steps}
         />
       </main>
 
