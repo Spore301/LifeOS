@@ -6,7 +6,9 @@ services:
         NEXT_PUBLIC_WORK_START: ${NEXT_PUBLIC_WORK_START:-09:00}
         NEXT_PUBLIC_WORK_END: ${NEXT_PUBLIC_WORK_END:-18:00}
     environment:
-      NEXTAUTH_URL: http://localhost:3000
+      # Public origin the app is reached on. MUST match the URL in the browser and the
+      # redirect URI registered in Google Cloud Console, or Google sign-in fails.
+      NEXTAUTH_URL: ${PUBLIC_URL:-http://localhost:3000}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
