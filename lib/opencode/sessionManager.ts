@@ -1,9 +1,11 @@
 import {
   ensureChatSession,
   sendChatMessage,
+  streamChatMessage,
   listSessionMessages,
   abortSession,
   deleteSession,
+  type AgentStreamEvent,
 } from './gateway';
 import {
   getChatRecord,
@@ -53,6 +55,49 @@ export async function sendToChat(
   setOnline(userId, chatId, true);
 
   const { reply } = await sendChatMessage(userId, chatId, info.sessionId, userText, { resume });
+  appendMessage(userId, chatId, { sender: 'assistant', content: reply });
+  touchActivity(userId, chatId);
+
+  return { sessionId: info.sessionId, reply, transcript: getTranscript(userId, chatId) };
+}
+
+/**
+ * Same as sendToChat, but reports progress while the run is in flight so the UI
+ * can show text as it arrives and name the steps the agent is taking.
+ * The transcript is written once at the end, exactly as the blocking path does.
+ */
+export async function streamToChat(
+  userId: string,
+  chatId: string,
+  userText: string,
+  onEvent: (event: AgentStreamEvent) => void,
+  opts: { createIfMissing?: boolean } = {}
+): Promise<ChatReply> {
+  const record = getChatRecord(userId, chatId);
+  if (!record && opts.createIfMissing === false) {
+    throw new Error('Chat not found');
+  }
+
+  const chat = getOrCreateChat(userId, chatId, { directory: chatDir(userId, chatId) });
+  const resume = Boolean(chat.sessionId);
+  const info = await ensureChatSession(userId, chatId, chat.sessionId, chat.sessionDirectory);
+
+  setSessionId(userId, chatId, info.sessionId, info.directory);
+  touchActivity(userId, chatId);
+
+  appendMessage(userId, chatId, { sender: 'user', content: userText });
+  setOnline(userId, chatId, true);
+
+  const reply = await streamChatMessage(
+    userId,
+    chatId,
+    info.sessionId,
+    info.directory,
+    userText,
+    { resume },
+    onEvent
+  );
+
   appendMessage(userId, chatId, { sender: 'assistant', content: reply });
   touchActivity(userId, chatId);
 

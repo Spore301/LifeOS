@@ -116,19 +116,16 @@ export async function ensureChatSession(
 }
 
 /**
- * Send a user message to the chat's OpenCode session and await the assistant reply.
- * Returns the assistant's text reply.
+ * Build the per-message context the agent needs: who the user is, what time it is
+ * for them, and how to call the backend as themselves. Shared by the blocking and
+ * streaming paths so the two can never drift apart.
  */
-export async function sendChatMessage(
+function buildPrompt(
   userId: string,
   chatId: string,
-  sessionId: string,
   userText: string,
-  opts: { resume?: boolean } = {}
-): Promise<{ reply: string; sessionId: string }> {
-  const client = getClient();
-  const sessionIdFinal = sessionId;
-
+  opts: { resume?: boolean }
+): string {
   const tz = getTimeZone();
   const now = new Date();
   // Both forms: the local wall clock is what the user thinks in, the ISO instant
@@ -149,26 +146,251 @@ export async function sendChatMessage(
     preamble += `${SESSION_RESUME_PROMPT}\n\n`;
   }
 
-  const fullText = `${preamble}---\nUser message:\n${userText}`;
+  return `${preamble}---\nUser message:\n${userText}`;
+}
 
-  const part = {
-    type: 'text' as const,
-    text: fullText,
-    synthetic: false,
+function promptBody(fullText: string) {
+  return {
+    parts: [{ type: 'text' as const, text: fullText, synthetic: false }],
+    model: { providerID: PROVIDER_ID, modelID: MODEL_ID },
+    system: SYSTEM_PROMPT,
   };
+}
+
+/**
+ * Send a user message to the chat's OpenCode session and await the assistant reply.
+ * Returns the assistant's text reply.
+ */
+export async function sendChatMessage(
+  userId: string,
+  chatId: string,
+  sessionId: string,
+  userText: string,
+  opts: { resume?: boolean } = {}
+): Promise<{ reply: string; sessionId: string }> {
+  const client = getClient();
 
   const res: any = await client.session.prompt({
-    path: { id: sessionIdFinal },
-    body: {
-      parts: [part],
-      model: { providerID: PROVIDER_ID, modelID: MODEL_ID },
-      system: SYSTEM_PROMPT,
-    },
+    path: { id: sessionId },
+    body: promptBody(buildPrompt(userId, chatId, userText, opts)),
     throwOnError: true,
   });
 
-  const reply = extractReplyText(res);
-  return { reply, sessionId: sessionIdFinal };
+  return { reply: extractReplyText(res), sessionId };
+}
+
+// Hard ceiling on a single agent run, so a stalled stream cannot hold a request
+// (and the browser's spinner) open indefinitely.
+const RUN_TIMEOUT_MS = 5 * 60 * 1000;
+
+/**
+ * Parse an SSE body into decoded event objects.
+ * Frames are separated by a blank line and can be split across chunks, so the
+ * partial tail is carried over until its terminator arrives.
+ */
+async function* readSseEvents(
+  body: ReadableStream<Uint8Array>,
+  signal: AbortSignal
+): AsyncGenerator<any> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (!signal.aborted) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const frames = buffer.split('\n\n');
+      buffer = frames.pop() || '';
+
+      for (const frame of frames) {
+        for (const line of frame.split('\n')) {
+          if (!line.startsWith('data:')) continue;
+          const raw = line.slice(5).trim();
+          if (!raw) continue;
+          try {
+            yield JSON.parse(raw);
+          } catch {
+            // Ignore keep-alives and anything that is not a JSON event.
+          }
+        }
+      }
+    }
+  } finally {
+    try {
+      await reader.cancel();
+    } catch {
+      // stream already torn down
+    }
+  }
+}
+
+/** What the UI is told while a run is in flight. */
+export type AgentStreamEvent =
+  | { type: 'text'; delta: string }
+  | { type: 'step'; id: string; tool: string; title?: string; status: string }
+  | { type: 'done'; reply: string }
+  | { type: 'error'; message: string };
+
+/** Human label for a tool call, so the UI can say what the agent is doing. */
+function stepTitle(tool: string, state: any): string | undefined {
+  if (state?.title) return String(state.title);
+  const input = state?.input || {};
+  if (typeof input.url === 'string') return input.url.replace(/^https?:\/\/[^/]+/, '');
+  if (typeof input.command === 'string') return String(input.command).slice(0, 80);
+  if (typeof input.filePath === 'string') return String(input.filePath);
+  return undefined;
+}
+
+/**
+ * Run a prompt and report progress as it happens.
+ *
+ * `session.prompt` blocks until the whole run finishes - every tool call, every
+ * model turn - so the UI could show nothing at all until the end. Here we start
+ * the run with `promptAsync` and follow the server's event stream instead,
+ * forwarding text deltas and tool steps as they occur.
+ *
+ * Returns the assembled reply text once the session goes idle.
+ */
+export async function streamChatMessage(
+  userId: string,
+  chatId: string,
+  sessionId: string,
+  directory: string,
+  userText: string,
+  opts: { resume?: boolean } = {},
+  onEvent: (event: AgentStreamEvent) => void = () => {}
+): Promise<string> {
+  const client = getClient();
+
+  // Subscribe BEFORE prompting, or a fast first token can land before we listen.
+  //
+  // Two things this has to get right:
+  //  - The SDK's event.subscribe() does not route through the custom fetch that
+  //    adds the server's Basic auth header, so it 401s and retries forever.
+  //  - The event stream is scoped per directory. Without ?directory= the server
+  //    sends only heartbeats and the run appears to hang forever.
+  const abort = new AbortController();
+  const timeout = setTimeout(() => abort.abort(), RUN_TIMEOUT_MS);
+
+  const eventUrl = `${OPENCODE_BASE_URL}/event?directory=${encodeURIComponent(directory)}`;
+  const eventRes = await fetch(eventUrl, {
+    headers: SERVER_AUTH_TOKEN ? { Authorization: SERVER_AUTH_TOKEN } : {},
+    signal: abort.signal,
+  });
+  if (!eventRes.ok || !eventRes.body) {
+    clearTimeout(timeout);
+    throw new Error(`OpenCode event stream unavailable (${eventRes.status})`);
+  }
+
+  await client.session.promptAsync({
+    path: { id: sessionId },
+    body: promptBody(buildPrompt(userId, chatId, userText, opts)),
+    throwOnError: true,
+  });
+
+  // Text parts arrive cumulatively; keep what we have seen per part so we can emit
+  // just the new suffix when the server does not hand us an explicit delta.
+  const seenText = new Map<string, string>();
+  const reportedSteps = new Map<string, string>();
+  // The server emits part updates for the USER message too - which is our whole
+  // preamble. Track message roles so only assistant text ever reaches the user.
+  const roleByMessage = new Map<string, string>();
+  let assembled = '';
+
+  for await (const event of readSseEvents(eventRes.body, abort.signal)) {
+    const props = event?.properties || {};
+
+    if (event?.type === 'session.error' && props.sessionID === sessionId) {
+      const message = props.error?.data?.message || props.error?.name || 'Agent run failed';
+      onEvent({ type: 'error', message: String(message) });
+      throw new Error(String(message));
+    }
+
+    if (event?.type === 'session.idle' && props.sessionID === sessionId) {
+      break;
+    }
+
+    if (event?.type === 'message.updated' && props.info?.id) {
+      roleByMessage.set(props.info.id, props.info.role);
+      continue;
+    }
+
+    if (event?.type !== 'message.part.updated') continue;
+
+    const part = props.part;
+    if (!part || part.sessionID !== sessionId) continue;
+
+    // Anything not yet known to be the assistant's is withheld: an unknown role is
+    // far more likely to be our own prompt than a reply worth showing.
+    const isAssistant = roleByMessage.get(part.messageID) === 'assistant';
+
+    if (part.type === 'text' && !part.synthetic && isAssistant) {
+      const full = typeof part.text === 'string' ? part.text : '';
+      const previous = seenText.get(part.id) ?? '';
+      const delta = typeof props.delta === 'string' && props.delta
+        ? props.delta
+        : full.slice(previous.length);
+      seenText.set(part.id, full);
+      if (delta) {
+        assembled += delta;
+        onEvent({ type: 'text', delta });
+      }
+      continue;
+    }
+
+    // Reasoning is the model's private thinking and must never reach the user.
+    if (part.type === 'tool') {
+      const status = part.state?.status || 'pending';
+      // Only report real transitions, not every incremental update of one call.
+      if (reportedSteps.get(part.id) === status) continue;
+      reportedSteps.set(part.id, status);
+      onEvent({
+        type: 'step',
+        id: part.id,
+        tool: part.tool || 'tool',
+        title: stepTitle(part.tool, part.state),
+        status,
+      });
+    }
+  }
+
+  clearTimeout(timeout);
+
+  // If role events never arrived we will have withheld everything, so read the
+  // finished reply back rather than showing the user nothing.
+  let reply = assembled.trim();
+  if (!reply) {
+    reply = await lastAssistantText(sessionId);
+  }
+
+  onEvent({ type: 'done', reply });
+  return reply;
+}
+
+/**
+ * Read the final assistant text straight from the session, as a fallback for the
+ * streaming path when no assistant text was captured live.
+ */
+async function lastAssistantText(sessionId: string): Promise<string> {
+  try {
+    const messages = await listSessionMessages(sessionId);
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const entry: any = messages[i];
+      if (entry?.info?.role !== 'assistant') continue;
+      const text = (entry.parts || [])
+        .filter((p: any) => p?.type === 'text' && !p.synthetic)
+        .map((p: any) => (p.text ?? '').trim())
+        .filter(Boolean)
+        .join('\n\n');
+      if (text) return text;
+    }
+  } catch {
+    // fall through to the placeholder
+  }
+  return '(no text reply)';
 }
 
 /**
