@@ -74,7 +74,8 @@ export interface ChatSessionInfo {
 export async function ensureChatSession(
   userId: string,
   chatId: string,
-  existingSessionId?: string
+  existingSessionId?: string,
+  existingSessionDirectory?: string
 ): Promise<ChatSessionInfo> {
   const client = getClient();
   const dir = chatDir(userId, chatId);
@@ -83,8 +84,15 @@ export async function ensureChatSession(
   // Always (re)write AGENTS.md so the system prompt is current.
   writeAgentsMd(userId, dir);
 
-  if (existingSessionId) {
-    // Best-effort resume; if the server doesn't know the id, fall through to create.
+  // Resume only when the session was created against the directory we are still
+  // using. A session bound to a path that has since moved (or is no longer mounted
+  // in the agent container) resolves fine but fails on every prompt, so treat a
+  // mismatch as "no session" and make a fresh one rather than 502 on every message.
+  // Strict equality on purpose: a record with no directory predates this tracking, so
+  // its session may be bound to the old layout. Recreate once, then it is recorded.
+  const directoryUnchanged = existingSessionDirectory === dir;
+  if (existingSessionId && directoryUnchanged) {
+    // Best-effort resume; if the server does not know the id, fall through to create.
     try {
       const res = await client.session.get({ path: { id: existingSessionId }, throwOnError: true } as any);
       if (res?.data?.id) {

@@ -43,10 +43,10 @@ export async function sendToChat(
 
   const chat = getOrCreateChat(userId, chatId, { directory: chatDir(userId, chatId) });
   const resume = Boolean(chat.sessionId);
-  const info = await ensureChatSession(userId, chatId, chat.sessionId);
+  const info = await ensureChatSession(userId, chatId, chat.sessionId, chat.sessionDirectory);
 
   // Persist the live opencode session id so future calls resume it.
-  setSessionId(userId, chatId, info.sessionId);
+  setSessionId(userId, chatId, info.sessionId, info.directory);
   touchActivity(userId, chatId);
 
   appendMessage(userId, chatId, { sender: 'user', content: userText });
