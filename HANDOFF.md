@@ -2,111 +2,159 @@
 
 ## 1. System Overview
 
-LifeOS is an AI-powered personal task and calendar assistant built with **Next.js (React / App Router)** and integrated with the **OpenCode AI agent engine** (`@opencode-ai/sdk`). 
+LifeOS is an AI-powered personal task and calendar assistant built with **Next.js 14 (App Router)** and driven by the **OpenCode agent engine** (`@opencode-ai/sdk`).
 
-It serves as an external memory and decision-support system grounded in task-management psychology (David Allen GTD, Kahneman & Tversky planning fallacy, Covey/Eisenhower prioritization, Cal Newport deep work).
+It is an external memory and decision-support system grounded in task-management psychology (Allen GTD, Kahneman planning fallacy, Covey/Eisenhower prioritisation, Newport deep work). See [docs/01](docs/01-task-management-psychology-research.md).
 
-### Architecture Highlights
-- **Web Frontend & API Server**: Next.js 14 App Router.
-- **AI Agent Engine**: OpenCode server (`opencode serve`) running per-chat sessions in user workspace folders (`/data/users/<userId>/chats/<chatId>`).
-- **Google Calendar Integration**: OAuth2 via NextAuth (`lib/auth.ts`) with automatic access token refresh (`lib/google-auth.ts`). Real event CRUD and FreeBusy queries.
-- **Persistent User Persona**: Nightly cron & session builder updates `persona.md` per user folder for shared long-term memory across chat threads.
+### How the pieces fit
+
+Two containers, defined in [docker-compose.yml](docker-compose.yml):
+
+| Service | Role |
+|---|---|
+| `lifeos` | Next.js app: web UI, REST API, all persistence |
+| `opencode` | `opencode serve` — the LLM agent that talks to the app over HTTP |
+
+The agent is a *client* of the LifeOS API, not a library inside it. Each chat maps to one OpenCode session whose working directory is a per-chat workspace.
+
+### Three volumes, deliberately separated
+
+| Volume | Mounted by | Holds |
+|---|---|---|
+| `lifeos-workspaces` | both | Per-chat agent workspaces (`AGENTS.md` only) |
+| `lifeos-data` | app only | `tasks.json`, `persona.md`, `chats.json`, transcripts |
+| `lifeos-secrets` | app only | Google tokens, agent session tokens |
+
+**This separation is load-bearing.** The agent can run shell commands inside whatever it mounts. When it mounted the whole data volume, one user's agent could read every other user's tasks, persona and transcripts, and their Google refresh token. Do not re-merge these mounts.
 
 ---
 
-## 2. Recent Fixes & Improvements
-
-1. **Google Calendar Payload Fix (`lib/calendar.ts`)**:
-   - Added `timeZone: 'Asia/Kolkata'` to start/end event payloads.
-   - Resolved 500 error (`Missing time zone definition for start time`) from Google Calendar API.
-   - Preserved recurrence alignment (e.g. `RRULE:FREQ=WEEKLY;BYDAY=MO`).
-
-2. **Task Recurrence Persistence (`lib/store/tasks.ts`)**:
-   - Passed `recurrence` through `createTask` so repeating task rules (e.g., `weekly` or explicit `RRULE` strings) persist in the user's task ledger.
-
-3. **Agent API Authorization Harmonization**:
-   - Refactored `/api/schedule`, `/api/schedule/confirm`, `/api/schedule/reschedule`, and `/api/calendar/today` handlers to use `resolveUserId(req)` and `getAccessToken(userId)`.
-   - Enabled server-to-server OpenCode agent tool calls (passing `X-LifeOS-User: <userId>`) to resolve real user accounts and access tokens instead of returning mock data.
-
----
-
-## 3. App Starting Steps
+## 2. Running it
 
 ### Prerequisites
-- Node.js v18+ or v22
-- npm
-- Google Cloud Console OAuth Client credentials (for Google Calendar sync)
+- Docker Desktop
+- Google Cloud OAuth client (Calendar scopes)
 
-### Step 1: Environment Configuration
-Copy `.env.example` to `.env.local` and populate the required keys:
+### Setup
 
 ```bash
-cp .env.example .env.local
+cp .env.example .env      # then fill it in
+docker compose up -d --build
 ```
 
-Key environment variables in `.env.local`:
-```env
-NEXTAUTH_URL=http://localhost:3000
-NEXTAUTH_SECRET=your-random-nextauth-secret
+Open http://localhost:3000.
 
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
+`.env` values that must be real — compose refuses to start without the starred ones:
 
-OPENCODE_BASE_URL=http://127.0.0.1:4096
-OPENCODE_PROVIDER=opencode
-OPENCODE_MODEL=big-pickle
-```
+| Variable | Notes |
+|---|---|
+| `LIFEOS_ADMIN_SECRET` * | Operator credential. Must not be the placeholder; ≥24 chars |
+| `OPENCODE_SERVER_PASSWORD` * | Shared by both containers so they always agree |
+| `NEXTAUTH_SECRET` | Session signing key |
+| `GOOGLE_CLIENT_ID` / `SECRET` | From Google Cloud Console |
+| `LIFEOS_CRON_SECRET` | Cron routes are **disabled** when unset |
+| `LIFEOS_TIMEZONE` | Default `Asia/Kolkata` |
+| `PUBLIC_URL` | Public origin when tunnelled; defaults to localhost |
 
-### Step 2: Install Dependencies
-```bash
-npm install
-```
+### Exposing it to other devices
 
-### Step 3: Start the OpenCode Server (AI Agent)
-In a separate terminal or background container, start the OpenCode server:
-
-```bash
-npx opencode serve --port 4096
-```
-
-Or using Docker:
-```bash
-docker run -d -p 4096:4096 ghcr.io/anomalyco/opencode serve --hostname 0.0.0.0 --port 4096
-```
-
-### Step 4: Start the Next.js Development Server
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Set `PUBLIC_URL` to the public origin **and** register `<PUBLIC_URL>/api/auth/callback/google` as an authorized redirect URI in Google Cloud Console. Google refuses plain HTTP for non-localhost, so the tunnel must be HTTPS. While the OAuth consent screen is in Testing, every other person must be added as a Test user or their sign-in simply fails.
 
 ---
 
-## 4. Verification & Testing
+## 3. The three models you need to understand
 
-- **TypeScript Typecheck**:
-  ```bash
-  npx tsc --noEmit
-  ```
-- **Build Verification**:
-  ```bash
-  npm run build
-  ```
+### Authentication
+
+Three distinct credentials, deliberately not interchangeable:
+
+1. **Web session** (NextAuth/Google) — how a human is identified.
+2. **Agent session token** (`X-LifeOS-User` + `X-LifeOS-Agent`) — minted per (user, chat), expires daily, resolves to exactly one account. This is what the agent carries. It is scoped precisely because the agent's context is prompt-injectable: a leaked token grants only what its owner already had.
+3. **Admin secret** (`X-LifeOS-User` + `X-LifeOS-Admin`) — operator tooling only. **Never put this in the agent's prompt.** It authorises impersonation of any user.
+
+Cron routes use `X-LifeOS-Cron` and fail closed when no secret is configured.
+
+### Time
+
+**All scheduling maths goes through [lib/timezone.ts](lib/timezone.ts).** Never use `setHours()`, `getHours()` or `toLocaleTimeString()` for anything user-facing.
+
+The app runs in a container whose local time is UTC. `new Date().setHours(9)` means 09:00 **UTC** — which is 14:30 IST. That single mistake is why a block requested for 9:00 AM appeared on the calendar at 2:30 PM. Google also ignores an event's `timeZone` field when its `dateTime` ends in `Z`, so tagging the payload `Asia/Kolkata` did not help.
+
+Instants stay real UTC `Date` objects everywhere (so they compare correctly against Google FreeBusy). Only day and work-hour *boundaries* are zone-aware.
+
+### Recurrence
+
+A task whose `recurrence` names specific weekdays is only due on those days ([lib/recurrence.ts](lib/recurrence.ts)). Without this gate a `BYDAY=TU,TH,SU` routine was also booked on Mondays, duplicating its own calendar series.
 
 ---
 
-## 5. API Reference Summary
+## 4. API reference
+
+All routes require an authenticated caller. `:id` is a task id.
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `GET` | `/api/tasks` | List user's active tasks |
-| `POST` | `/api/tasks` | Create task with priority, deadline, recurrence |
-| `PATCH` | `/api/tasks/:id` | Update task details |
-| `PATCH` | `/api/tasks/:id/block` | Flag task as blocked with reason |
-| `POST` | `/api/schedule` | Calculate proposed schedule from active tasks & calendar freebusy |
-| `POST` | `/api/schedule/confirm` | Write confirmed tasks to Google Calendar |
-| `PATCH` | `/api/schedule/reschedule` | Re-calculate schedule after blocker updates |
-| `GET` | `/api/calendar/today` | Fetch today's calendar events |
-| `POST` | `/api/chat/:chatId/message` | Send message to user's OpenCode session |
-| `GET` | `/api/chats` | List user chat sessions |
+| `GET` | `/api/tasks` | List tasks (filter by `state`, `project`) |
+| `POST` | `/api/tasks` | Create task (incl. `recurrence`) |
+| `PATCH` | `/api/tasks/:id` | Update task |
+| `PATCH` | `/api/tasks/:id/block` | Flag/clear a blocker |
+| `POST` | `/api/tasks/:id/reminder-response` | Reminder intent loop (docs/04) |
+| `GET` | `/api/calendar/today` | **Read** the real Google Calendar. Returns `mocked: true` when there is no working token — do not present those as real events |
+| `POST` | `/api/agenda/schedule` | Propose today's schedule |
+| `POST` | `/api/agenda/confirm` | Write to Google Calendar (**upserts** by task id) |
+| `DELETE` | `/api/agenda/event` | Remove a task's calendar block |
+| `GET` | `/api/persona` | Read persona |
+| `POST` | `/api/persona` | `{append}` a durable fact, or `{persona}` to replace |
+| `POST` | `/api/chat/:chatId/message` | Blocking chat turn |
+| `POST` | `/api/chat/:chatId/message/stream` | **SSE** chat turn: text deltas + live tool steps |
+| `GET` | `/api/chats` | List chats |
+| `POST` | `/api/cron/reminders` | Reminder worker (cron secret) |
+| `POST` | `/api/cron/build-persona` | Nightly persona build (cron secret) |
+
+`/api/schedule`, `/api/schedule/confirm` and `/api/schedule/reschedule` are a **legacy parallel stack**. The agent uses `/api/agenda/*`. Prefer the agenda routes; see open issue 4.
+
+### Streaming notes
+
+Three things are easy to get wrong and cost real time:
+
+- The SDK's `event.subscribe()` does **not** route through the custom fetch that adds the opencode Basic auth header. It 401s and retries forever. Read `/event` directly.
+- That stream is **scoped per directory**. Without `?directory=` you get heartbeats only and the run looks hung.
+- The server emits part updates for the **user** message too — which is the whole preamble. Filter on message role, or the assistant appears to open every reply by reciting its own prompt (agent token included).
+
+---
+
+## 5. Verification
+
+```bash
+npx tsc --noEmit                          # typecheck
+docker compose up -d --build              # rebuild
+docker compose logs -f lifeos             # app logs
+```
+
+Auth behaviour worth re-checking after any change to `lib/auth-user.ts`:
+
+```
+placeholder / wrong / absent admin secret  -> 401
+agent token used for another account       -> 401
+POST /api/parse, /api/transcribe unauth'd  -> 401
+cron routes without secret                 -> 401
+```
+
+---
+
+## 6. Known open issues
+
+Ordered by what will bite first. Full context in the review discussion.
+
+1. **The nightly persona build erases stated preferences.** `buildPersona` calls `setPersona` with a wholesale replacement and the fallback builder regenerates from scratch, so the `## Stated preferences` block (e.g. "always use IST") is wiped on the next cron run. Fix before relying on persona memory.
+2. **Reminders will spam.** `computeDueReminders` never checks `reminderAcknowledged` despite its doc comment, and a task with no deadline skips the lead-time gate entirely, so it fires on every tick. The quiet window also still uses server-local `getHours()`, so "22:00–08:00" actually runs 03:30–13:30 IST.
+3. **A failed token refresh returns the dead token.** `getAccessToken` falls through to the expired value, so `needsCalendarAuth` reads false and the write 401s later.
+4. **Two parallel scheduling stacks** (`/api/schedule*` vs `/api/agenda/*`) that have already drifted. Collapse them.
+5. **The JSON store is not concurrency-safe.** Every store does read-modify-write with a non-atomic `writeFileSync`; concurrent agent and UI writes drop one, and a crash mid-write truncates the ledger. `appendMessage` rewrites the whole transcript per message.
+6. **Three invalid sort comparators** (`lib/notifications.ts`, `lib/store/chats.ts`, the tasks route) never return 0 and mishandle missing values, so "most recently active" is unreliable.
+7. **`sanitize()` collisions** — `a.b@x.com` and `a-b@x.com` map to the same user directory.
+8. **Minor** — `googleapis` is a dependency but never imported; the Dockerfile runs as root; no `output: 'standalone'`, so the runner image carries full `node_modules`.
+
+### Architectural note
+
+The agent calls the REST API by curling endpoints described in prose. That is why it could claim "Saved to memory" when nothing was saved, and why it believed a calendar-read endpoint did not exist. Turning these into typed OpenCode tools would make a failed call an error the model must reckon with rather than something it can narrate past — the structural fix for a whole class of confident-but-false replies.
