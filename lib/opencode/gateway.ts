@@ -1,7 +1,8 @@
 import { createOpencodeClient, type OpencodeClient } from '@opencode-ai/sdk';
 import { SYSTEM_PROMPT, SESSION_RESUME_PROMPT } from './prompts';
-import { chatDir, ensureDir, writeText, readText, nowIso } from '../store/paths';
+import { chatDir, ensureDir, writeText, readText } from '../store/paths';
 import { getPersona } from '../store/persona';
+import { formatInZone, getTimeZone } from '../timezone';
 
 /**
  * Thin, resilient wrapper around the OpenCode SDK server.
@@ -13,6 +14,15 @@ import { getPersona } from '../store/persona';
 
 const OPENCODE_BASE_URL =
   process.env.OPENCODE_BASE_URL || 'http://127.0.0.1:4096';
+
+// Base URL the OPENCODE AGENT uses to reach the LifeOS REST API. The agent runs in
+// its own container, where "localhost" is NOT the Next.js app - compose sets this to
+// the compose service name (http://lifeos:3000). Defaults to localhost for bare-metal dev.
+const API_BASE_URL = process.env.LIFEOS_API_BASE_URL || 'http://localhost:3000';
+
+// Production builds only trust X-LifeOS-User when it comes with this shared secret,
+// so the agent must send it alongside the user header (see lib/auth-user.ts).
+const ADMIN_SECRET = process.env.LIFEOS_ADMIN_SECRET || '';
 
 // Model selection. Prefer env, fall back to the LifeOS default ("big pickle").
 // Values are documented in .env.example. Example: OPENCODE_PROVIDER=opencode, OPENCODE_MODEL=big-pickle
@@ -114,10 +124,23 @@ export async function sendChatMessage(
   const client = getClient();
   const sessionIdFinal = sessionId;
 
-  let preamble = `[LifeOS context] Date/time now: ${nowIso()}\n\n`;
+  const tz = getTimeZone();
+  const now = new Date();
+  // Both forms: the local wall clock is what the user thinks in, the ISO instant
+  // is what the API speaks. Giving only the UTC one invited "it is 00:47" mistakes.
+  let preamble = `[LifeOS context] Now: ${formatInZone(now, tz)} ${tz} (ISO instant ${now.toISOString()})\n`;
+  preamble += `Timezone: ${tz}. State EVERY time you show the user in that zone, and name it.\n\n`;
   preamble += `User persona (read it fully):\n${getPersona(userId)}\n\n`;
   preamble += `Your LifeOS user id (identity): ${userId}\n`;
-  preamble += `When you call the LifeOS backend API (any /api/... route), you MUST include the header "X-LifeOS-User: ${userId}" on every request so the backend resolves your real account (and its Google calendar token). Do not rely on a fallback user.\n\n`;
+  preamble += `LifeOS backend API base URL: ${API_BASE_URL}\n`;
+  preamble += `Call every /api/... route against THAT base URL exactly as given. Do not substitute localhost: you run in a different container from the API, so localhost is not the LifeOS app.\n`;
+  preamble += `On EVERY /api request you MUST send these headers, or the backend rejects you (401) or falls back to a stub user with no calendar:\n`;
+  preamble += `  X-LifeOS-User: ${userId}\n`;
+  if (ADMIN_SECRET) {
+    preamble += `  X-LifeOS-Admin: ${ADMIN_SECRET}\n`;
+    preamble += `The X-LifeOS-Admin value is a server credential. Send it in request headers only; never print it, echo it back, or write it into a file.\n`;
+  }
+  preamble += `\n`;
 
   if (opts.resume) {
     preamble += `${SESSION_RESUME_PROMPT}\n\n`;
@@ -179,17 +202,29 @@ export function isOpenCodeConfigured(): boolean {
 /**
  * Extract the assistant's textual reply from a session.prompt result.
  * The response shape is an AssistantMessage with parts; we concatenate text parts.
+ *
+ * `reasoning` parts are the model's private chain-of-thought and must never be
+ * shown to the user — they are only used as a last resort if the model produced
+ * no visible text at all, so the chat doesn't render an empty bubble.
  */
 function extractReplyText(res: any): string {
   const info = res?.data?.info ?? res?.data;
   const parts: any[] = res?.data?.parts ?? info?.parts ?? [];
-  const texts = (Array.isArray(parts) ? parts : [])
-    .filter((p: any) => p && (p.type === 'text' || p.type === 'reasoning'))
-    .map((p: any) => p.text ?? '')
-    .filter(Boolean);
-  if (texts.length) return texts.join('\n');
-  if (typeof info?.content === 'string') return info.content;
-  if (typeof info?.message === 'string') return info.message;
+  const list = Array.isArray(parts) ? parts : [];
+
+  const pick = (type: string) =>
+    list
+      .filter((p: any) => p && p.type === type && !p.synthetic)
+      .map((p: any) => (p.text ?? '').trim())
+      .filter(Boolean);
+
+  const texts = pick('text');
+  if (texts.length) return texts.join('\n\n');
+  if (typeof info?.content === 'string' && info.content.trim()) return info.content;
+  if (typeof info?.message === 'string' && info.message.trim()) return info.message;
+
+  const reasoning = pick('reasoning');
+  if (reasoning.length) return reasoning.join('\n\n');
   return '(no text reply)';
 }
 

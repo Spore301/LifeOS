@@ -1,0 +1,7 @@
+# Files that are executed inside Linux containers must keep LF endings.
+# With core.autocrlf=true a Windows checkout would rewrite them to CRLF, and the
+# shebang then fails inside the image ("/bin/sh^M: bad interpreter").
+*.sh text eol=lf
+Dockerfile text eol=lf
+**/Dockerfile text eol=lf
+docker-compose.yml text eol=lf
