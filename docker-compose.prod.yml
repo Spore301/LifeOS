@@ -1,0 +1,36 @@
+# Production overlay. Use together with the base file:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Differences from local development:
+#  - the app is NOT published on a host port; only Caddy is reachable from outside
+#  - Caddy terminates TLS on 80/443 with an automatic Let's Encrypt certificate
+services:
+  lifeos:
+    # Reset the published port from the base file. Caddy reaches the app over the
+    # compose network instead, so nothing but the proxy is exposed to the internet.
+    ports: !override []
+    restart: unless-stopped
+
+  opencode:
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    depends_on:
+      - lifeos
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env, e.g. lifeos.example.com}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates live here. Losing this volume means re-issuing certs and
+      # risking Let's Encrypt rate limits, so keep it.
+      - caddy-data:/data
+      - caddy-config:/config
+    restart: unless-stopped
+
+volumes:
+  caddy-data:
+  caddy-config:
