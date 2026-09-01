@@ -1,0 +1,25 @@
+# TLS terminator for LifeOS. Caddy obtains and renews a Let's Encrypt
+# certificate for $DOMAIN automatically; nothing to configure or cron.
+{$DOMAIN} {
+	encode zstd gzip
+
+	reverse_proxy lifeos:3000 {
+		# CRITICAL for the chat: /api/chat/.../message/stream is server-sent events.
+		# With default buffering the whole reply arrives in one lump at the end, which
+		# is exactly the "stuck thinking" experience streaming was built to remove.
+		flush_interval -1
+
+		# Long agent runs must not be cut off mid-stream.
+		transport http {
+			read_timeout 10m
+			write_timeout 10m
+		}
+	}
+
+	# The app is the only thing here; deny anything probing for stray files.
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}
