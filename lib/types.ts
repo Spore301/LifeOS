@@ -12,6 +12,9 @@ export interface Task {
   /** Recurrence for calendar events. 'weekly' = repeat weekly on the slot's
    *  weekday/time; or a raw RRULE string (e.g. 'RRULE:FREQ=WEEKLY;BYDAY=MO'). */
   recurrence?: string;
+  /** Immovable start/end for meetings and appointments. */
+  fixedStart?: string;
+  fixedEnd?: string;
 }
 
 export interface ClarificationQuestion {

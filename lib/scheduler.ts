@@ -56,8 +56,46 @@ export function calculateProposedSchedule(
     });
   }
 
+  // A fixed commitment (a meeting, a call) is not a duration looking for a gap.
+  // Place it where it actually is, then plan the day around it. Previously every
+  // task was treated as movable, so the scheduler kept relocating a standup that
+  // could not move and the agent had to write slots by hand.
+  const fixedTasks = activeTasks.filter((t) => t.fixedStart);
+  const flexibleTasks = activeTasks.filter((t) => !t.fixedStart);
+
+  const fixedSlots: TimeSlot[] = [];
+  for (const task of fixedTasks) {
+    const start = new Date(task.fixedStart as string);
+    if (Number.isNaN(start.getTime())) {
+      conflictWarnings.push(`Task "${task.title}" has an unreadable fixed time and was skipped.`);
+      unscheduledTasks.push(task);
+      continue;
+    }
+    const end = task.fixedEnd
+      ? new Date(task.fixedEnd)
+      : new Date(start.getTime() + task.durationMinutes * 60 * 1000);
+
+    // Report a clash rather than resolving it: only the user can decide whether
+    // to leave a meeting or the thing it collides with.
+    const clash = existingBusySlots.find(
+      (b) => new Date(b.start) < end && new Date(b.end) > start
+    );
+    if (clash) {
+      conflictWarnings.push(
+        `"${task.title}" is fixed at this time but overlaps something already on the calendar.`
+      );
+    }
+
+    const slot = { start: start.toISOString(), end: end.toISOString() };
+    scheduledTasks.push({ task, slot });
+    fixedSlots.push(slot);
+  }
+
+  // Everything else is planned around the fixed commitments as if they were busy.
+  const blockedOut = [...existingBusySlots, ...fixedSlots];
+
   // Sort tasks by priority descending
-  const sortedTasks = [...activeTasks].sort(
+  const sortedTasks = [...flexibleTasks].sort(
     (a, b) => PRIORITY_WEIGHT[b.priority] - PRIORITY_WEIGHT[a.priority]
   );
 
@@ -77,7 +115,7 @@ export function calculateProposedSchedule(
   }
 
   // Sort busy slots chronologically
-  const busySorted = [...existingBusySlots].sort(
+  const busySorted = [...blockedOut].sort(
     (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()
   );
 
@@ -160,7 +198,9 @@ export function calculateProposedSchedule(
       if (task.priority === 'urgent' || task.priority === 'high') {
         // Try bumping lower-priority scheduled task
         const lowerPriorityScheduled = scheduledTasks.filter(
-          st => PRIORITY_WEIGHT[st.task.priority] < PRIORITY_WEIGHT[task.priority]
+          // A fixed commitment is never bumped - it is not ours to move, however
+          // urgent the thing competing for its slot happens to be.
+          st => !st.task.fixedStart && PRIORITY_WEIGHT[st.task.priority] < PRIORITY_WEIGHT[task.priority]
         );
 
         if (lowerPriorityScheduled.length > 0) {

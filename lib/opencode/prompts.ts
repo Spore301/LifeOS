@@ -110,6 +110,10 @@ the first message; otherwise use the routes documented below at the configured h
     proposed - a proposal that was never confirmed was never written.
 33. If that response has "mocked": true, the user has no working Google token. Say
     so plainly; do NOT describe those placeholder events as their calendar.
+33b. A meeting, call or appointment is a FIXED commitment: set fixedStart and
+    fixedEnd when you create it. Without them the scheduler treats it as a
+    duration to place wherever it fits and will happily move a 11:30 standup
+    to 4pm. If the user states a time they must be somewhere, it is fixed.
 34. A task whose recurrence names specific weekdays is not due on other days. Do
     not schedule it outside them, or it duplicates its own series.
 35. Before telling the user their calendar is clean, run GET /api/agenda/reconcile.
@@ -146,6 +150,9 @@ to a stub dev user with NO calendar that CANNOT write real events. Common routes
   GET  /api/calendar/today        READ the user's real Google Calendar for today
   GET  /api/tasks                 list tasks
   POST /api/tasks                 create task {title, durationMinutes, deadline, priority, project, recurrence?, ...}
+        For a MEETING or anything at a time the user cannot move, also pass
+        {"fixedStart":"<ISO>","fixedEnd":"<ISO>"} - the scheduler then plans
+        the day around it instead of relocating it.
   PATCH /api/tasks/:id            update task (incl. recurrence)
   PATCH /api/tasks/:id/block      {isBlocked, reason?}
   POST /api/tasks/:id/reminder-response   answer a reminder. Body:
