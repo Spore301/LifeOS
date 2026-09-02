@@ -68,11 +68,12 @@ export default function ChatSidebar({
 
       <aside
         className={`
-          bg-white border-r border-slate-200 flex flex-col
+          bg-white border-r border-slate-200 flex flex-col overflow-hidden
           fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] shadow-xl
           transition-transform duration-200 ease-out
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-          md:static md:z-auto md:w-64 md:max-w-none md:translate-x-0 md:shadow-none md:h-full
+          md:static md:z-auto md:w-64 md:max-w-none md:translate-x-0 md:shadow-none
+          md:self-stretch
         `}
       >
       <div className="p-3">
