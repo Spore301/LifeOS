@@ -72,6 +72,9 @@ function normalizeReminders(raw: any[]): DueReminderUi[] {
     durationMinutes: r.durationMinutes,
     priority: r.priority,
     suggestion: r.suggestion,
+    needsAction: r.needsAction,
+    alsoOverdue: r.alsoOverdue,
+    rescheduleCount: r.rescheduleCount,
   }));
 }
 
@@ -93,6 +96,7 @@ export default function Home() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [dueReminders, setDueReminders] = useState<DueReminderUi[]>([]);
   const [activeReminder, setActiveReminder] = useState<DueReminderUi | null>(null);
+  const [alwaysLetAgentDecide, setAlwaysLetAgentDecide] = useState(false);
 
   const processingRef = useRef(false);
 
@@ -124,6 +128,10 @@ export default function Home() {
     if (status !== 'authenticated') return;
     fetchChats();
     fetchTodayEvents();
+    fetch('/api/preferences')
+      .then((r) => r.json())
+      .then((d) => setAlwaysLetAgentDecide(!!d.preferences?.alwaysLetAgentDecide))
+      .catch(() => {});
   }, [status, fetchChats, fetchTodayEvents]);
 
   // Load history for a newly selected chat.
@@ -331,9 +339,35 @@ export default function Home() {
     try {
       const res = await fetch('/api/reminders/due');
       const data = await res.json();
-      setDueReminders(normalizeReminders(data.due));
+
+      // Overdue blocks come first: they are asking for a decision, not offering
+      // a nudge, and the day cannot be trusted until they are resolved. `prompts`
+      // is already batched server-side, so a busy day is one interruption.
+      const overdueFirst = [
+        ...normalizeReminders(data.prompts),
+        ...normalizeReminders(data.due),
+      ];
+
+      // A task can appear in both lists; show it once, in its more urgent form.
+      const seen = new Set<string>();
+      setDueReminders(overdueFirst.filter((r) => !seen.has(r.taskId) && seen.add(r.taskId)));
     } catch (e) {
       console.error('Reminder poll error:', e);
+    }
+  }, []);
+
+  // Explicit settings, kept out of the persona because the nightly build
+  // rewrites that file wholesale and would discard them.
+  const savePreference = useCallback(async (value: boolean) => {
+    setAlwaysLetAgentDecide(value);
+    try {
+      await fetch('/api/preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alwaysLetAgentDecide: value }),
+      });
+    } catch (e) {
+      console.error('Could not save preference:', e);
     }
   }, []);
 
@@ -403,7 +437,12 @@ export default function Home() {
         />
       </main>
 
-      <ReminderToast reminder={activeReminder} onResolved={handleReminderResolved} />
+      <ReminderToast
+        reminder={activeReminder}
+        onResolved={handleReminderResolved}
+        alwaysLetAgentDecide={alwaysLetAgentDecide}
+        onPreferenceChange={savePreference}
+      />
 
       {showCalendarPreview && (
         <div className="fixed inset-y-0 right-0 w-full sm:w-96 bg-white border-l border-slate-200 shadow-2xl z-50 overflow-y-auto p-5">
