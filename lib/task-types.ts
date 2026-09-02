@@ -25,6 +25,11 @@ export interface Task {
    *  operation that writes the block, never independently. The calendar remains
    *  the source of truth; this exists so overdue detection does not need a Google
    *  round-trip on every reminder poll. */
+  /** A commitment that cannot move: a meeting, call, or appointment. The
+   *  scheduler places it exactly here and plans the day AROUND it, rather than
+   *  treating it as a duration to slot wherever it fits. */
+  fixedStart?: string;
+  fixedEnd?: string;
   scheduledStart?: string;
   scheduledEnd?: string;
   /** Why the task slipped or was moved. Feeds estimate calibration (docs/01). */

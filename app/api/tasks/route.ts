@@ -49,6 +49,9 @@ export async function POST(req: NextRequest) {
     nextAction: body.nextAction,
     completionCriterion: body.completionCriterion,
     recurrence: body.recurrence,
+    // An immovable meeting time, if this is a commitment rather than work.
+    fixedStart: typeof body.fixedStart === 'string' ? body.fixedStart : undefined,
+    fixedEnd: typeof body.fixedEnd === 'string' ? body.fixedEnd : undefined,
   });
 
   return NextResponse.json({ task }, { status: 201 });
