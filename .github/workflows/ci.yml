@@ -1,0 +1,45 @@
+name: CI
+
+# Runs on every pull request and every push to main. No secrets are used here,
+# so it is safe for pull requests from forks.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+        env:
+          # next build evaluates env at build time. These are placeholders purely
+          # so the build resolves; nothing here is a real credential and nothing
+          # from this job reaches production.
+          NEXT_PUBLIC_WORK_START: '09:00'
+          NEXT_PUBLIC_WORK_END: '18:00'
+
+      - name: Check for committed secrets
+        run: |
+          # A private key or .env reaching this public repo is unrecoverable once
+          # pushed, so fail the build rather than rely on anyone noticing.
+          if git ls-files | grep -E '(^|/)\.env$|\.pem$|calendar_tokens\.json$|agent_tokens\.json$'; then
+            echo "::error::A credential file is tracked by git. Remove it and rotate the secret."
+            exit 1
+          fi
+          echo "No credential files tracked."
