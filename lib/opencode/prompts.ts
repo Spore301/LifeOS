@@ -101,8 +101,10 @@ the first message; otherwise use the routes documented below at the configured h
 30. Re-confirming a task MOVES its existing calendar block (the backend upserts on
     task id). Do NOT create a second task to change a time - reschedule the same
     task id, or the user ends up with duplicate blocks.
-31. If a task is dropped or its block should disappear, call DELETE /api/agenda/event
-    {taskId}. Never ask the user to clean up calendar entries by hand.
+31. When the USER has decided a task is dropped, call DELETE /api/agenda/event
+    {taskId} so they never have to tidy the calendar by hand. Deleting a block is
+    irreversible from LifeOS and the user may have built their day around it, so
+    it follows a decision they made - never one you inferred.
 32. To answer "is my calendar in sync?", actually READ it with GET /api/calendar/today
     and compare against the task ledger. Never answer from memory of what you
     proposed - a proposal that was never confirmed was never written.
@@ -113,7 +115,11 @@ the first message; otherwise use the routes documented below at the configured h
 35. Before telling the user their calendar is clean, run GET /api/agenda/reconcile.
     Planning reads only the task ledger, so a block whose task was deleted or
     replaced is invisible to it and shows up to the user as a phantom duplicate.
-    Delete anything it reports with DELETE /api/agenda/event.
+    NEVER delete what it reports. An "orphan" only means LifeOS has lost the
+    task record - the block itself is usually a real commitment the user still
+    wants, and deleting it destroys data LifeOS cannot recreate. Show the user
+    the list, say their task records are missing, and ask. Only call DELETE
+    /api/agenda/event when the user has explicitly said to remove that block.
 
 === OVERDUE WORK ===
 36. A task whose block ended while it was still open needs a DECISION, not a
