@@ -34,6 +34,8 @@ function toSchedulerTasks(userId: string): SchedulerTask[] {
       blockerReason: t.blockerReason,
       category: t.project,
       recurrence: t.recurrence,
+      fixedStart: t.fixedStart,
+      fixedEnd: t.fixedEnd,
     }));
 }
 

@@ -1,0 +1,46 @@
+name: Deploy
+
+# Only after CI has passed on main. Never runs for pull requests, so a PR from a
+# fork can never reach the server or read the deploy key.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  # Manual re-deploy from the Actions tab, e.g. after changing .env on the box.
+  workflow_dispatch:
+
+concurrency:
+  # Two deploys building at once would exhaust 2 GB of RAM.
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # workflow_run fires regardless of outcome; only deploy green builds.
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy over SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+          SSH_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          if [ -z "$SSH_KEY" ] || [ -z "$SSH_HOST" ] || [ -z "$SSH_USER" ]; then
+            echo "::error::Missing DEPLOY_SSH_KEY / DEPLOY_HOST / DEPLOY_USER secrets."
+            exit 1
+          fi
+
+          mkdir -p ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+          # The server-side script owns the rollout, including its own health
+          # check and rollback, so a bad commit cannot leave the app down.
+          ssh -i ~/.ssh/deploy_key -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
+            'bash ~/LifeOS/scripts/deploy.sh'

@@ -12,6 +12,9 @@ export interface Task {
   /** Recurrence for calendar events. 'weekly' = repeat weekly on the slot's
    *  weekday/time; or a raw RRULE string (e.g. 'RRULE:FREQ=WEEKLY;BYDAY=MO'). */
   recurrence?: string;
+  /** Immovable start/end for meetings and appointments. */
+  fixedStart?: string;
+  fixedEnd?: string;
 }
 
 export interface ClarificationQuestion {
@@ -62,6 +65,8 @@ export interface CalendarEvent {
   start: { dateTime?: string; date?: string };
   end: { dateTime?: string; date?: string };
   recurrence?: string[];
+  /** Google palette id; LifeOS marks done blocks green and overdue ones yellow. */
+  colorId?: string;
   extendedProperties?: {
     private?: Partial<LifeOSPrivateProperties>;
   };

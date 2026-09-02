@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { CalendarEvent, ProposedSchedule } from '@/lib/types';
-import { Calendar as CalendarIcon, Clock, Sparkles, X } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Sparkles, X, AlertTriangle, Check } from 'lucide-react';
 
 interface CalendarPreviewProps {
   isOpen: boolean;
@@ -64,18 +64,50 @@ export default function CalendarPreview({
 
                 <div className="flex-1 space-y-1.5">
                   {/* Existing Google Calendar Events */}
-                  {hourEvents.map((evt) => (
-                    <div
-                      key={evt.id}
-                      className="bg-slate-100 border border-slate-200 rounded-lg p-2 flex items-center justify-between text-xs"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-indigo-600" />
-                        <span className="font-medium text-slate-800">{evt.summary}</span>
+                  {hourEvents.map((evt) => {
+                    // The server marks these when a block's window closed with the
+                    // task still open, so the state is derived once and rendered
+                    // identically here, in the toast, and in Google Calendar.
+                    const needsAction = (evt.summary || '').includes('(!)');
+                    const done = (evt.summary || '').includes('DONE -');
+
+                    return (
+                      <div
+                        key={evt.id}
+                        className={`rounded-lg p-2 flex items-center justify-between text-xs border ${
+                          needsAction
+                            ? 'bg-amber-50 border-amber-300'
+                            : done
+                            ? 'bg-emerald-50 border-emerald-200'
+                            : 'bg-slate-100 border-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          {needsAction ? (
+                            <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                          ) : done ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                          ) : (
+                            <div className="w-2 h-2 rounded-full bg-indigo-600 flex-shrink-0" />
+                          )}
+                          <span
+                            className={`font-medium truncate ${
+                              needsAction ? 'text-amber-900' : done ? 'text-emerald-900' : 'text-slate-800'
+                            }`}
+                          >
+                            {evt.summary}
+                          </span>
+                        </div>
+                        <span
+                          className={`text-[10px] flex-shrink-0 ml-2 ${
+                            needsAction ? 'text-amber-700 font-medium' : 'text-slate-400'
+                          }`}
+                        >
+                          {needsAction ? 'Action required' : done ? 'Done' : 'Existing'}
+                        </span>
                       </div>
-                      <span className="text-[10px] text-slate-400">Existing</span>
-                    </div>
-                  ))}
+                    );
+                  })}
 
                   {/* Pending Proposed Slots */}
                   {proposedInHour &&

@@ -1,4 +1,4 @@
-import { Task, ReminderResponseInput, Priority } from '../task-types';
+import { Task, Priority } from '../task-types';
 import { ensureDir, userDir, tasksFile, readJson, writeJson, nowIso } from './paths';
 
 interface TaskLedger {
@@ -37,6 +37,10 @@ export function createTask(userId: string, input: Partial<Task>): Task {
     completionCriterion: input.completionCriterion,
     snoozeUntil: input.snoozeUntil,
     recurrence: input.recurrence,
+    fixedStart: input.fixedStart,
+    fixedEnd: input.fixedEnd,
+    scheduledStart: input.scheduledStart,
+    scheduledEnd: input.scheduledEnd,
     reminderAcknowledged: input.reminderAcknowledged ?? false,
     createdAt: now,
     updatedAt: now,
@@ -86,41 +90,6 @@ export function completeTask(userId: string, taskId: string, actualMinutes?: num
     completedAt: nowIso(),
     reminderAcknowledged: true,
   });
-}
-
-/**
- * Handles a reminder response (intent loop, see docs/04).
- * Returns the resulting task (or null if the task wasn't found).
- */
-export function applyReminderResponse(
-  userId: string,
-  input: ReminderResponseInput
-): Task | null {
-  switch (input.intent) {
-    case 'ACCEPT':
-      return updateTask(userId, input.taskId, { reminderAcknowledged: true });
-    case 'DONE':
-      return completeTask(userId, input.taskId, input.actualDurationMinutes);
-    case 'DELAYED':
-      return updateTask(userId, input.taskId, {
-        isBlocked: true,
-        state: 'blocked',
-        blockerReason: input.reason,
-        reminderAcknowledged: true,
-      });
-    case 'SNOOZE':
-      return updateTask(userId, input.taskId, {
-        snoozeUntil: input.snoozeUntil,
-        reminderAcknowledged: true,
-      });
-    case 'DROP':
-      return updateTask(userId, input.taskId, {
-        state: 'deferred',
-        reminderAcknowledged: true,
-      });
-    default:
-      return null;
-  }
 }
 
 export function sanitizePriority(p: string): Priority {

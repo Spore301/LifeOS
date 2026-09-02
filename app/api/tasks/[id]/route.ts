@@ -31,6 +31,13 @@ export async function PATCH(req: NextRequest, ctx: any) {
   if (typeof body.nextAction === 'string') patch.nextAction = body.nextAction;
   if (typeof body.completionCriterion === 'string') patch.completionCriterion = body.completionCriterion;
   if (typeof body.recurrence === 'string') patch.recurrence = body.recurrence;
+  // The booked window. Kept in step with the calendar block by whatever moves it
+  // (a reminder action, or a confirmed schedule), never edited on its own.
+  if (typeof body.fixedStart === 'string') patch.fixedStart = body.fixedStart;
+  if (typeof body.fixedEnd === 'string') patch.fixedEnd = body.fixedEnd;
+  if (typeof body.scheduledStart === 'string') patch.scheduledStart = body.scheduledStart;
+  if (typeof body.scheduledEnd === 'string') patch.scheduledEnd = body.scheduledEnd;
+  if (typeof body.slipReason === 'string') patch.slipReason = body.slipReason;
   if (Array.isArray(body.dependsOn)) patch.dependsOn = body.dependsOn;
   if (Array.isArray(body.subtasks)) patch.subtasks = body.subtasks;
 

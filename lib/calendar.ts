@@ -33,6 +33,9 @@ export async function fetchGoogleCalendarEvents(
       description: evt.description,
       start: evt.start,
       end: evt.end,
+      // Carried through so callers can read a block's state from its colour
+      // rather than string-matching its summary.
+      colorId: evt.colorId,
       extendedProperties: evt.extendedProperties,
     }));
   } catch (error) {
@@ -188,6 +191,75 @@ export async function findManagedEventId(
     // Lookup is best-effort: on failure we fall back to creating a new event.
     return null;
   }
+}
+
+/** Google's palette ids for the states a block can be in. */
+const COLOR_DONE = '2'; // green
+const COLOR_NEEDS_ACTION = '5'; // yellow
+
+/**
+ * Patch the block for a task in place: retitle it, recolour it, or both.
+ * Used to mark a block DONE or flag it as needing the user's attention, without
+ * moving or deleting it.
+ */
+async function patchManagedEvent(
+  accessToken: string,
+  taskId: string,
+  patch: Record<string, unknown>
+): Promise<boolean> {
+  const eventId = await findManagedEventId(accessToken, taskId);
+  if (!eventId) return false;
+
+  const res = await fetch(
+    `${GOOGLE_CALENDAR_API}/calendars/primary/events/${encodeURIComponent(eventId)}`,
+    {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(patch),
+    }
+  );
+  if (!res.ok) {
+    throw new Error(`Google Calendar patch failed: ${await res.text()}`);
+  }
+  return true;
+}
+
+/**
+ * Mark a task's block as completed.
+ *
+ * The block is kept, not deleted: a finished slot is the record of how the day
+ * actually went, and deleting it would erase exactly the history that makes
+ * future estimates better.
+ */
+export async function markEventDone(
+  accessToken: string,
+  taskId: string,
+  title: string
+): Promise<boolean> {
+  if (!accessToken) return false;
+  return patchManagedEvent(accessToken, taskId, {
+    summary: `[LifeOS] DONE - ${title}`,
+    colorId: COLOR_DONE,
+  });
+}
+
+/**
+ * Flag a block whose window closed while the task was still open, so the user
+ * sees it needs a decision from their phone's calendar app, not just in LifeOS.
+ */
+export async function markEventNeedsAction(
+  accessToken: string,
+  taskId: string,
+  title: string
+): Promise<boolean> {
+  if (!accessToken) return false;
+  return patchManagedEvent(accessToken, taskId, {
+    summary: `[LifeOS] (!) ${title}`,
+    colorId: COLOR_NEEDS_ACTION,
+  });
 }
 
 /** Remove the calendar block LifeOS created for a task. Returns true if one was deleted. */
