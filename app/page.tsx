@@ -89,6 +89,8 @@ export default function Home() {
   const [steps, setSteps] = useState<AgentStep[]>([]);
   const [existingEvents, setExistingEvents] = useState<CalendarEvent[]>([]);
   const [showCalendarPreview, setShowCalendarPreview] = useState(false);
+  // Chat drawer, small screens only. The sidebar is always visible from md up.
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [dueReminders, setDueReminders] = useState<DueReminderUi[]>([]);
   const [activeReminder, setActiveReminder] = useState<DueReminderUi | null>(null);
 
@@ -146,9 +148,12 @@ export default function Home() {
   const handleSelectChat = (chatId: string) => {
     setActiveChatId(chatId);
     loadChat(chatId);
+    // On mobile the drawer sits on top of the chat it just opened.
+    setIsSidebarOpen(false);
   };
 
   const handleCreateChat = async () => {
+    setIsSidebarOpen(false);
     try {
       const res = await fetch('/api/chats', {
         method: 'POST',
@@ -369,6 +374,7 @@ export default function Home() {
       <Header
         onToggleCalendarPreview={() => setShowCalendarPreview((prev) => !prev)}
         showCalendarPreview={showCalendarPreview}
+        onOpenSidebar={() => setIsSidebarOpen(true)}
       />
 
       <main className="flex-1 flex overflow-hidden">
@@ -382,6 +388,8 @@ export default function Home() {
           onSignOut={() => signOut()}
           userLabel={userLabel || undefined}
           userImage={session?.user?.image}
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
         />
 
         <ChatInterface
@@ -398,7 +406,7 @@ export default function Home() {
       <ReminderToast reminder={activeReminder} onResolved={handleReminderResolved} />
 
       {showCalendarPreview && (
-        <div className="fixed inset-y-0 right-0 w-96 bg-white border-l border-slate-200 shadow-2xl z-40 overflow-y-auto p-5">
+        <div className="fixed inset-y-0 right-0 w-full sm:w-96 bg-white border-l border-slate-200 shadow-2xl z-50 overflow-y-auto p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-slate-900">Today&apos;s Calendar</h2>
             <button
