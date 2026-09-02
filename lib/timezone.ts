@@ -113,10 +113,31 @@ export function rruleWeekday(date: Date, timeZone: string): string {
   return RRULE_DAY[partsInZone(date, timeZone).weekday] || 'MO';
 }
 
-/** Human label for the agent and UI, e.g. "9:00 am". */
+/** Human label for the agent and UI, e.g. "9:00 am". Time only - see below. */
 export function formatInZone(date: Date, timeZone: string): string {
   return new Intl.DateTimeFormat('en-IN', {
     timeZone,
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(date);
+}
+
+/**
+ * Full local date AND time, e.g. "Thu, 03 Sep 2026, 1:43 am".
+ *
+ * The agent used to be given the local TIME plus a UTC ISO instant, so the only
+ * date it could read was the UTC one. Between 00:00 and 05:30 IST those are
+ * different days, and it confidently reported "Wed Sep 2" at 1:43 am on Thursday
+ * the 3rd. Anything that states a date to the user must use this, not the instant.
+ */
+export function formatDateTimeInZone(date: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat('en-IN', {
+    timeZone,
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,

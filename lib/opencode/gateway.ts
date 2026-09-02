@@ -2,7 +2,7 @@ import { createOpencodeClient, type OpencodeClient } from '@opencode-ai/sdk';
 import { SYSTEM_PROMPT, SESSION_RESUME_PROMPT } from './prompts';
 import { chatDir, ensureDir, writeText, readText } from '../store/paths';
 import { getPersona } from '../store/persona';
-import { formatInZone, getTimeZone } from '../timezone';
+import { formatDateTimeInZone, getTimeZone } from '../timezone';
 import { issueAgentToken } from '../store/agentTokens';
 
 /**
@@ -130,7 +130,8 @@ function buildPrompt(
   const now = new Date();
   // Both forms: the local wall clock is what the user thinks in, the ISO instant
   // is what the API speaks. Giving only the UTC one invited "it is 00:47" mistakes.
-  let preamble = `[LifeOS context] Now: ${formatInZone(now, tz)} ${tz} (ISO instant ${now.toISOString()})\n`;
+  let preamble = `[LifeOS context] Now: ${formatDateTimeInZone(now, tz)} ${tz}\n`;
+  preamble += `That local date is authoritative. The ISO instant ${now.toISOString()} is UTC and its DATE is often the previous day - never read a date off it.\n`;
   preamble += `Timezone: ${tz}. State EVERY time you show the user in that zone, and name it.\n\n`;
   preamble += `User persona (read it fully):\n${getPersona(userId)}\n\n`;
   preamble += `Your LifeOS user id (identity): ${userId}\n`;

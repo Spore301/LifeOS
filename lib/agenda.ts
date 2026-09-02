@@ -1,5 +1,5 @@
 import { calculateProposedSchedule } from './scheduler';
-import { getTasks } from './store/tasks';
+import { getTasks, updateTask } from './store/tasks';
 import { Task as SchedulerTask, ProposedSchedule } from './types';
 import {
   fetchGoogleFreeBusy,
@@ -95,6 +95,13 @@ export async function confirmWrite(userId: string, scheduledTasks: ProposedSched
       task: st.task,
       slot: st.slot,
     } as any);
+    // Record the slot on the task in the SAME operation that writes the block.
+    // Without this the ledger never learns a task is booked, so overdue detection
+    // (which keys off scheduledEnd) silently never fires for it.
+    updateTask(userId, st.task.id, {
+      scheduledStart: st.slot.start,
+      scheduledEnd: st.slot.end,
+    });
     written.push(evt);
   }
   return {

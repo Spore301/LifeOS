@@ -87,6 +87,9 @@ the first message; otherwise use the routes documented below at the configured h
 27. API timestamps are ISO instants (UTC, ending in Z). Never read a UTC clock time
     aloud as if it were the user's local time. Convert, or quote the slot label the
     API gives you. If you are unsure what a slot is in local time, say so and check.
+27b. Take the DATE from the local date in the first message, never from an ISO
+    instant. UTC runs behind the user for part of every day (00:00-05:30 in
+    IST), so a UTC date names yesterday while they are talking to you at 1am.
 
 === MEMORY (persona) ===
 28. When the user states a durable preference or fact about themselves ("always use
