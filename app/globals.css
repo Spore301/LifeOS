@@ -13,7 +13,8 @@ body {
   background-color: #f8fafc;
   color: #0f172a;
   font-family: 'Inter', sans-serif;
-  min-height: 100vh;
+  min-height: 100vh; /* fallback for browsers without dvh support */
+  min-height: 100dvh; /* mobile-safe: excludes the browser chrome vh over-counts */
   overflow-x: hidden;
 }
 
@@ -64,4 +65,14 @@ body {
 
 .animate-mic-light {
   animation: micPulseLight 1.5s infinite;
+}
+
+/* One-time settle-in for the reminder toast — no continuous motion once it's on screen. */
+@keyframes toastIn {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.animate-toast-in {
+  animation: toastIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
