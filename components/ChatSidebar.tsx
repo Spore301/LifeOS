@@ -21,6 +21,9 @@ interface ChatSidebarProps {
   onSignOut: () => void;
   userLabel?: string;
   userImage?: string | null;
+  /** Drawer state on small screens. Ignored from `md` up, where it is always shown. */
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
 // A short, glanceable "last touched" label — not a precise timestamp.
@@ -49,9 +52,29 @@ export default function ChatSidebar({
   onSignOut,
   userLabel,
   userImage,
+  isOpen = false,
+  onClose,
 }: ChatSidebarProps) {
   return (
-    <aside className="w-64 shrink-0 bg-white border-r border-slate-200 flex flex-col h-full">
+    <>
+      {/* Scrim: only exists while the drawer is open on small screens. */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-[1px] md:hidden"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
+
+      <aside
+        className={`
+          bg-white border-r border-slate-200 flex flex-col
+          fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] shadow-xl
+          transition-transform duration-200 ease-out
+          ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+          md:static md:z-auto md:w-64 md:max-w-none md:translate-x-0 md:shadow-none md:h-full
+        `}
+      >
       <div className="p-3">
         <button
           onClick={onCreate}
@@ -149,6 +172,7 @@ export default function ChatSidebar({
           </button>
         </div>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }
