@@ -7,6 +7,37 @@ import ChatSidebar, { ChatListItem } from '@/components/ChatSidebar';
 import ReminderToast, { DueReminderUi } from '@/components/ReminderToast';
 import { CalendarEvent } from '@/lib/types';
 import { useSession, signIn, signOut } from 'next-auth/react';
+import { Sparkles, User, Loader2 } from 'lucide-react';
+
+/** ChatGPT-style logged-out screen: the only action available is signing in. */
+function SignInScreen() {
+  return (
+    <div
+      className="min-h-dvh flex flex-col items-center justify-center bg-slate-50 text-slate-900 px-4"
+      style={{
+        backgroundImage: 'radial-gradient(circle, #e2e8f0 1px, transparent 1px)',
+        backgroundSize: '24px 24px',
+      }}
+    >
+      <div className="flex flex-col items-center px-8 py-10 rounded-3xl bg-white/70 backdrop-blur-sm border border-slate-200/80 shadow-sm">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-indigo-400 flex items-center justify-center shadow-sm mb-5">
+          <Sparkles className="w-6 h-6 text-white" />
+        </div>
+        <h1 className="text-lg font-semibold tracking-tight text-slate-900 mb-1.5">Welcome to LifeOS</h1>
+        <p className="text-sm text-slate-500 max-w-xs text-center mb-7 leading-relaxed">
+          Your voice-first AI scheduling assistant. Sign in to pick up your chats, tasks, and reminders.
+        </p>
+        <button
+          onClick={() => signIn('google')}
+          className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm transition-colors"
+        >
+          <User className="w-4 h-4" />
+          Sign in with Google
+        </button>
+      </div>
+    </div>
+  );
+}
 
 // Map server-side JSON chat records to the sidebar shape.
 function normalizeChats(raw: any[]): ChatListItem[] {
@@ -86,11 +117,12 @@ export default function Home() {
     }
   }, []);
 
-  // Load initial chat list + calendar.
+  // Load initial chat list + calendar, once signed in.
   useEffect(() => {
+    if (status !== 'authenticated') return;
     fetchChats();
     fetchTodayEvents();
-  }, [fetchChats, fetchTodayEvents]);
+  }, [status, fetchChats, fetchTodayEvents]);
 
   // Load history for a newly selected chat.
   const loadChat = useCallback(
@@ -301,10 +333,11 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    if (status !== 'authenticated') return;
     pollReminders();
     const id = setInterval(pollReminders, 20000);
     return () => clearInterval(id);
-  }, [pollReminders]);
+  }, [status, pollReminders]);
 
   // Surface the first unresolved reminder as the active toast.
   useEffect(() => {
@@ -317,8 +350,22 @@ export default function Home() {
 
   const userLabel = session?.user?.name || session?.user?.email || '';
 
+  // Session still resolving: avoid flashing the sign-in screen for an already-authenticated user.
+  if (status === 'loading') {
+    return (
+      <div className="min-h-dvh flex items-center justify-center bg-slate-50">
+        <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
+      </div>
+    );
+  }
+
+  // ChatGPT-style logged-out state: nothing but a sign-in screen.
+  if (status !== 'authenticated') {
+    return <SignInScreen />;
+  }
+
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 selection:bg-indigo-600 selection:text-white">
+    <div className="min-h-dvh flex flex-col bg-slate-50 text-slate-900 selection:bg-indigo-600 selection:text-white">
       <Header
         onToggleCalendarPreview={() => setShowCalendarPreview((prev) => !prev)}
         showCalendarPreview={showCalendarPreview}
@@ -332,8 +379,9 @@ export default function Home() {
           onSelect={handleSelectChat}
           onCreate={handleCreateChat}
           onDelete={handleDeleteChat}
-          onSignOut={() => (status === 'authenticated' ? signOut() : signIn('google'))}
+          onSignOut={() => signOut()}
           userLabel={userLabel || undefined}
+          userImage={session?.user?.image}
         />
 
         <ChatInterface

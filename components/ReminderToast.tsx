@@ -46,38 +46,39 @@ export default function ReminderToast({ reminder, onResolved }: ReminderToastPro
   };
 
   return (
-    <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 w-[min(520px,92vw)] animate-bounce">
-      <div className="bg-white border border-amber-200 rounded-2xl p-4 shadow-2xl">
+    <div className="fixed bottom-24 left-1/2 z-50 w-[min(520px,92vw)] animate-toast-in">
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xl">
         <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center flex-shrink-0">
-            <Bell className="w-5 h-5 animate-mic-light" />
+          <div className="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center flex-shrink-0">
+            <Bell className="w-4 h-4" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="text-xs font-semibold text-amber-900 tracking-wide uppercase">
+            <div className="text-xs font-semibold text-amber-700 tracking-wide uppercase">
               Reminder
             </div>
             <p className="text-sm font-medium text-slate-900 mt-0.5">{reminder.title}</p>
             <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{reminder.suggestion}</p>
 
+            {/* One clear primary action ("do it now"); everything else is a quieter, equal-weight alternative. */}
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <button
                 onClick={() => sendIntent('ACCEPT')}
                 disabled={!!pendingIntent}
-                className="px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 rounded-lg transition-all"
+                className="px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-lg transition-colors"
               >
-                {pendingIntent === 'ACCEPT' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Got it - do it'}
+                {pendingIntent === 'ACCEPT' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Got it — do it'}
               </button>
               <button
                 onClick={() => sendIntent('DONE')}
                 disabled={!!pendingIntent}
-                className="px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-lg transition-all"
+                className="px-3 py-1.5 text-xs font-medium text-slate-600 bg-white hover:bg-slate-50 border border-slate-200 disabled:opacity-50 rounded-lg transition-colors"
               >
-                {pendingIntent === 'DONE' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Done'}
+                {pendingIntent === 'DONE' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Already done'}
               </button>
               <button
                 onClick={() => sendIntent('DELAYED')}
                 disabled={!!pendingIntent}
-                className="px-3 py-1.5 text-xs font-semibold text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 rounded-lg transition-all"
+                className="px-3 py-1.5 text-xs font-medium text-slate-600 bg-white hover:bg-slate-50 border border-slate-200 disabled:opacity-50 rounded-lg transition-colors"
               >
                 {pendingIntent === 'DELAYED' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Can't do now"}
               </button>
@@ -86,7 +87,7 @@ export default function ReminderToast({ reminder, onResolved }: ReminderToastPro
                 <select
                   value={snoozeMinutes}
                   onChange={(e) => setSnoozeMinutes(Number(e.target.value))}
-                  className="text-[11px] border border-slate-200 rounded-lg px-1.5 py-1 bg-white text-slate-700 outline-none"
+                  className="text-[11px] border border-slate-200 rounded-lg px-1.5 py-1 bg-white text-slate-600 outline-none"
                   disabled={!!pendingIntent}
                 >
                   <option value={15}>15m</option>
@@ -97,7 +98,7 @@ export default function ReminderToast({ reminder, onResolved }: ReminderToastPro
                 <button
                   onClick={() => sendIntent('SNOOZE')}
                   disabled={!!pendingIntent}
-                  className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 rounded-lg transition-all"
+                  className="px-3 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-50 disabled:opacity-50 rounded-lg transition-colors"
                 >
                   {pendingIntent === 'SNOOZE' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Snooze'}
                 </button>

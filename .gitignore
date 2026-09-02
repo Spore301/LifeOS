@@ -30,3 +30,7 @@ next-env.d.ts
 
 # OpenCode server / user data
 /data
+/workspaces
+
+# Per-user Google OAuth tokens (see lib/store/paths.ts) — never commit these
+/secrets

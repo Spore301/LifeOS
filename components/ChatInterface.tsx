@@ -161,7 +161,7 @@ export default function ChatInterface({
   const handleTextSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const input = textInput.trim();
-    if (!input || isProcessing || !chatId) return;
+    if (!input || isProcessing) return;
     deliver(input);
   };
 
@@ -192,7 +192,7 @@ export default function ChatInterface({
             <p className="text-xs text-slate-500 max-w-md mt-1 leading-relaxed">
               {chatId
                 ? 'Each chat is backed by its own always-on assistant session with your persona and tool access.'
-                : 'Choose a chat on the left or create a new one. Speak or type your raw brain dump and LifeOS will handle tasks, scheduling, and reminders.'}
+                : 'Speak or type your raw brain dump below — LifeOS will start a new chat automatically and handle tasks, scheduling, and reminders.'}
             </p>
             {!chatId && (
               <div className="mt-6 flex flex-wrap gap-2 justify-center">
@@ -317,12 +317,12 @@ export default function ChatInterface({
           <button
             type="button"
             onClick={isRecording ? stopRecording : startRecording}
-            disabled={isProcessing || !chatId}
+            disabled={isProcessing}
             className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
               isRecording
                 ? 'bg-rose-600 text-white animate-mic-light'
                 : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-600 border border-indigo-200'
-            } ${isProcessing || !chatId ? 'opacity-50 cursor-not-allowed' : ''}`}
+            } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
             title={isRecording ? 'Click to stop' : 'Click to speak'}
           >
             {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
@@ -334,18 +334,16 @@ export default function ChatInterface({
               value={textInput}
               onChange={(e) => setTextInput(e.target.value)}
               placeholder={
-                !chatId
-                  ? 'Select or create a chat first'
-                  : isRecording
+                isRecording
                   ? `Recording... (${formatTime(recordingTime)})`
                   : 'Type or speak your message...'
               }
-              disabled={isProcessing || isRecording || !chatId}
+              disabled={isProcessing || isRecording}
               className="flex-1 bg-transparent px-2 py-2 text-sm text-slate-800 placeholder-slate-400 outline-none"
             />
             <button
               type="submit"
-              disabled={!textInput.trim() || isProcessing || isRecording || !chatId}
+              disabled={!textInput.trim() || isProcessing || isRecording}
               className="w-10 h-10 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-xl flex items-center justify-center shadow-sm transition-all"
             >
               {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
