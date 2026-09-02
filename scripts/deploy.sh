@@ -25,7 +25,19 @@ if [ "$PREVIOUS" = "$(git rev-parse HEAD)" ]; then
   echo "already up to date; rebuilding anyway to pick up any .env change"
 fi
 
-sudo "${COMPOSE[@]}" up -d --build
+# --remove-orphans clears containers left behind by an interrupted deploy, which
+# otherwise hold the name the new one needs.
+#
+# The exit code is captured rather than allowed to abort the script: compose
+# reports a name Conflict while recreating a container even when it goes on to
+# succeed, and under `set -e` that skipped the health check, the prune and the
+# rollback entirely - a working deploy looked failed, and a genuinely broken one
+# would never have been rolled back. Health is the arbiter, not this exit code.
+set +e
+sudo "${COMPOSE[@]}" up -d --build --remove-orphans
+compose_status=$?
+set -e
+[ "$compose_status" -ne 0 ] && echo "compose exited $compose_status - deciding on health instead"
 
 # Give the app a moment to bind before deciding it is broken.
 echo "waiting for health..."
