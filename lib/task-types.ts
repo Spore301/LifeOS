@@ -21,6 +21,11 @@ export interface Task {
   completionCriterion?: string;
   snoozeUntil?: string;
   reminderAcknowledged?: boolean;
+  /** When this task is currently booked, as ISO instants. This is the ledger's
+   *  copy of the calendar block, and the thing that lets the two be reconciled:
+   *  without it a proposal was ephemeral and the calendar drifted immediately. */
+  scheduledStart?: string;
+  scheduledEnd?: string;
   /** Recurrence for calendar events. 'weekly' = repeat weekly on the slot's
    *  weekday/time; or a raw RRULE string (e.g. 'RRULE:FREQ=WEEKLY;BYDAY=MO'). */
   recurrence?: string;

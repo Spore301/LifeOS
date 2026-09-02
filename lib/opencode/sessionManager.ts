@@ -14,9 +14,11 @@ import {
   setOnline,
   touchActivity,
   setAllOffline,
+  titleFromFirstMessage,
 } from '../store/chats';
 import { appendMessage, getTranscript, getLastN, StoredChatMessage } from '../store/messages';
 import { chatDir } from '../store/paths';
+import { syncCalendar, taskFingerprint } from '../calendarSync';
 
 export interface ChatReply {
   sessionId: string;
@@ -51,11 +53,15 @@ export async function sendToChat(
   setSessionId(userId, chatId, info.sessionId, info.directory);
   touchActivity(userId, chatId);
 
+  const ledgerBefore = taskFingerprint(userId);
   appendMessage(userId, chatId, { sender: 'user', content: userText });
+  // Name the chat after its opening message so the sidebar is scannable.
+  titleFromFirstMessage(userId, chatId, userText);
   setOnline(userId, chatId, true);
 
   const { reply } = await sendChatMessage(userId, chatId, info.sessionId, userText, { resume });
   appendMessage(userId, chatId, { sender: 'assistant', content: reply });
+  scheduleCalendarSync(userId, ledgerBefore);
   touchActivity(userId, chatId);
 
   return { sessionId: info.sessionId, reply, transcript: getTranscript(userId, chatId) };
@@ -85,7 +91,10 @@ export async function streamToChat(
   setSessionId(userId, chatId, info.sessionId, info.directory);
   touchActivity(userId, chatId);
 
+  const ledgerBefore = taskFingerprint(userId);
   appendMessage(userId, chatId, { sender: 'user', content: userText });
+  // Name the chat after its opening message so the sidebar is scannable.
+  titleFromFirstMessage(userId, chatId, userText);
   setOnline(userId, chatId, true);
 
   const reply = await streamChatMessage(
@@ -99,6 +108,7 @@ export async function streamToChat(
   );
 
   appendMessage(userId, chatId, { sender: 'assistant', content: reply });
+  scheduleCalendarSync(userId, ledgerBefore);
   touchActivity(userId, chatId);
 
   return { sessionId: info.sessionId, reply, transcript: getTranscript(userId, chatId) };
@@ -149,4 +159,23 @@ export async function getRawSessionMessages(userId: string, chatId: string): Pro
   const record = getChatRecord(userId, chatId);
   if (!record?.sessionId) return [];
   return listSessionMessages(record.sessionId);
+}
+
+/**
+ * Reconcile the calendar after a turn, without making the user wait for it.
+ *
+ * Runs only when the agent actually changed the task ledger, and is deliberately
+ * not awaited: Google round-trips would otherwise add seconds between the agent
+ * finishing and the reply appearing. Failures are logged, never surfaced as a
+ * chat error, since the reply itself succeeded.
+ */
+function scheduleCalendarSync(userId: string, ledgerBefore: string): void {
+  if (taskFingerprint(userId) === ledgerBefore) return;
+
+  void syncCalendar(userId)
+    .then((r) => {
+      if (r.skipped) return;
+      console.log(`[calendarSync] ${userId}: +${r.written} written, -${r.removed} removed, ${r.scheduled.length} placed, ${r.rolledOver.length} rolled over`);
+    })
+    .catch((err) => console.error('[calendarSync] failed:', err));
 }

@@ -37,6 +37,8 @@ export function createTask(userId: string, input: Partial<Task>): Task {
     completionCriterion: input.completionCriterion,
     snoozeUntil: input.snoozeUntil,
     recurrence: input.recurrence,
+    scheduledStart: input.scheduledStart,
+    scheduledEnd: input.scheduledEnd,
     reminderAcknowledged: input.reminderAcknowledged ?? false,
     createdAt: now,
     updatedAt: now,

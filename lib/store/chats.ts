@@ -18,6 +18,8 @@ interface ChatRegistry {
   chats: Record<string, ChatRecord>;
 }
 
+export const DEFAULT_CHAT_TITLE = 'New LifeOS chat';
+
 const empty = (): ChatRegistry => ({ chats: {} });
 
 function fileFor(userId: string): string {
@@ -55,7 +57,7 @@ export function getOrCreateChat(
     rec = {
       chatId,
       sessionId: undefined,
-      title: opts.title || 'New LifeOS chat',
+      title: opts.title || DEFAULT_CHAT_TITLE,
       directory: opts.directory,
       createdAt: now,
       updatedAt: now,
@@ -77,6 +79,28 @@ export function getOrCreateChat(
     save(userId, reg);
   }
   return rec;
+}
+
+/**
+ * Name a chat after the user's opening message, so the sidebar is scannable.
+ * Only ever replaces the placeholder - a chat the user has renamed, or one
+ * already named from its first message, is left alone.
+ */
+export function titleFromFirstMessage(userId: string, chatId: string, message: string): void {
+  const reg = registry(userId);
+  const rec = reg.chats[chatId];
+  if (!rec) return;
+  if (rec.title && rec.title !== DEFAULT_CHAT_TITLE) return;
+
+  const cleaned = message.replace(/\s+/g, ' ').trim();
+  if (!cleaned) return;
+
+  // Long enough to tell two chats apart, short enough for a 288px sidebar.
+  const title = cleaned.length > 48 ? `${cleaned.slice(0, 48).trimEnd()}...` : cleaned;
+
+  rec.title = title;
+  rec.updatedAt = nowIso();
+  save(userId, reg);
 }
 
 export function setSessionId(

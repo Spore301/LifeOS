@@ -1,5 +1,5 @@
 import { calculateProposedSchedule } from './scheduler';
-import { getTasks } from './store/tasks';
+import { getTasks, updateTask } from './store/tasks';
 import { Task as SchedulerTask, ProposedSchedule } from './types';
 import {
   fetchGoogleFreeBusy,
@@ -93,6 +93,13 @@ export async function confirmWrite(userId: string, scheduledTasks: ProposedSched
       task: st.task,
       slot: st.slot,
     } as any);
+    // Record the slot on the task as well as the calendar. Without this the
+    // ledger has no idea when anything is booked, so nothing can later detect
+    // that the two have drifted apart.
+    updateTask(userId, st.task.id, {
+      scheduledStart: st.slot.start,
+      scheduledEnd: st.slot.end,
+    });
     written.push(evt);
   }
   return {
