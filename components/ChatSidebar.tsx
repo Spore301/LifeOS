@@ -51,7 +51,7 @@ export default function ChatSidebar({
   userImage,
 }: ChatSidebarProps) {
   return (
-    <aside className="w-64 shrink-0 bg-white border-r border-slate-200 flex flex-col h-full">
+    <aside className="w-64 shrink-0 self-stretch bg-white border-r border-slate-200 flex flex-col overflow-hidden">
       <div className="p-3">
         <button
           onClick={onCreate}
