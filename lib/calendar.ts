@@ -33,6 +33,9 @@ export async function fetchGoogleCalendarEvents(
       description: evt.description,
       start: evt.start,
       end: evt.end,
+      // Carried through so callers can read a block's state from its colour
+      // rather than string-matching its summary.
+      colorId: evt.colorId,
       extendedProperties: evt.extendedProperties,
     }));
   } catch (error) {

@@ -62,6 +62,8 @@ export interface CalendarEvent {
   start: { dateTime?: string; date?: string };
   end: { dateTime?: string; date?: string };
   recurrence?: string[];
+  /** Google palette id; LifeOS marks done blocks green and overdue ones yellow. */
+  colorId?: string;
   extendedProperties?: {
     private?: Partial<LifeOSPrivateProperties>;
   };
